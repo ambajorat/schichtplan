@@ -638,6 +638,38 @@ function buildDefault() {
   s(4, "steri", 0, "14:00", "18:00", ["beatrice"]);
   return a;
 }
+
+// Migrate old data: split cells with multiple people into separate slots
+function migrateAssignments(a) {
+  const result = {};
+  Object.entries(a).forEach(([k, sids]) => {
+    if (!sids || sids.length === 0) return;
+    if (sids.length === 1) {
+      result[k] = sids;
+      return;
+    }
+    const p = k.split("-");
+    const day = p[0],
+      station = p[1],
+      time = p[3];
+    sids.forEach(sid => {
+      let placed = false;
+      for (let s = 0; s < 20; s++) {
+        const nk = `${day}-${station}-${s}-${time}`;
+        if (!result[nk] || result[nk].length === 0) {
+          result[nk] = [sid];
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        const nk = `${day}-${station}-0-${time}`;
+        result[nk] = result[nk] ? [...result[nk], sid] : [sid];
+      }
+    });
+  });
+  return result;
+}
 function isAvailable(staff, dayIdx, time, vacations, wsStr) {
   var _staff$availability;
   const av = (_staff$availability = staff.availability) === null || _staff$availability === void 0 ? void 0 : _staff$availability[dayIdx];
@@ -1732,14 +1764,14 @@ function Schichtplaner() {
       const as = loadData(`praxis-${weekKey(weekStart)}`, null);
       setStaffList(st);
       setVacations(va);
-      setAssignments(as || buildDefault());
+      setAssignments(migrateAssignments(as || buildDefault()));
       setLoaded(true);
     })();
   }, []);
   useEffect(() => {
     if (!loaded) return;
     const as = loadData(`praxis-${weekKey(weekStart)}`, null);
-    setAssignments(as || buildDefault());
+    setAssignments(migrateAssignments(as || buildDefault()));
   }, [weekStart, loaded]);
   const saveTimer = useRef(null);
   useEffect(() => {
@@ -1764,8 +1796,7 @@ function Schichtplaner() {
       const slot = findFreeSlot(n, shiftDay, shiftStation, shiftFrom, shiftTo);
       TIME_SLOTS.filter(s => s.start >= shiftFrom && s.start < shiftTo).forEach(sl => {
         const k = `${shiftDay}-${shiftStation}-${slot}-${sl.start}`;
-        const c = n[k] || [];
-        if (!c.includes(shiftStaff)) n[k] = [...c, shiftStaff];
+        n[k] = [shiftStaff];
       });
       return n;
     });
