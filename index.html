@@ -829,16 +829,12 @@ function findFreeSlot(assignments, day, station, from, to) {
 }
 
 // Auto-scheduler: generate a week plan based on station requirements and staff availability
-function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
+function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practiceHours) {
   var plan = {};
   var weekHours = {};
   staffList.forEach(function (s) {
     weekHours[s.id] = 0;
   });
-
-  // Opening hours (default 07:30-20:00)
-  var openFrom = "07:30",
-    openTo = "20:00";
   function assignBlock(dayIdx, stationId, staffId, fromTime, toTime) {
     var slot = 0;
     for (var si = 0; si < 10; si++) {
@@ -857,6 +853,19 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
     weekHours[staffId] += (timeToMin(toTime) - timeToMin(fromTime)) / 60;
   }
   DAYS.forEach(function (_, di) {
+    // Determine opening hours for this day
+    var ph = getPracticeHoursForDay(practiceHours || [], weekStartStr, di);
+    var openFrom = ph ? ph.from : "07:30";
+    var openTo = ph ? ph.to : "20:00";
+    // Check if day is closed (special period exists but this day has no hours)
+    var dt2 = new Date(weekStartStr + "T00:00:00");
+    dt2.setDate(dt2.getDate() + di);
+    var ds2 = fmtDate(dt2);
+    var isClosed = false;
+    (practiceHours || []).forEach(function (p) {
+      if (ds2 >= p.from && ds2 <= p.to && !p.hours[di]) isClosed = true;
+    });
+    if (isClosed) return;
     var avail = [];
     staffList.forEach(function (s) {
       var av = s.availability ? s.availability[di] : null;
@@ -4484,7 +4493,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.2"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.3"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -4805,7 +4814,7 @@ function Schichtplaner() {
           reqs: reqs
         };
       });
-      var proposed = autoSchedule(staffList, vacations, wsStr, cfg);
+      var proposed = autoSchedule(staffList, vacations, wsStr, cfg, practiceHours);
       setAssignments(proposed);
       setShowStationCfg(false);
     },
@@ -4835,7 +4844,7 @@ function Schichtplaner() {
           reqs: reqs
         };
       });
-      var proposed = autoSchedule(staffList, vacations, wsStr, cfg);
+      var proposed = autoSchedule(staffList, vacations, wsStr, cfg, practiceHours);
       setAssignments(function (prev) {
         var merged = Object.assign({}, prev);
         Object.keys(proposed).forEach(function (k) {
