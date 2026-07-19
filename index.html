@@ -3533,64 +3533,7 @@ function Schichtplaner() {
     };
     return m;
   });
-  useEffect(() => {
-    const parseHash = h => {
-      if (h.startsWith("#plan=")) {
-        try {
-          setRoData(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
-          setRoTeam(null);
-        } catch (e) {}
-      } else if (h.startsWith("#team=")) {
-        try {
-          setRoTeam(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
-          setRoData(null);
-        } catch (e) {}
-      } else {
-        setRoData(null);
-        setRoTeam(null);
-      }
-    };
-    parseHash(window.location.hash);
-    const onHash = () => parseHash(window.location.hash);
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
-  }, []);
-  if (roData) return /*#__PURE__*/React.createElement(ReadOnlyView, {
-    data: roData
-  });
-  if (roTeam) return /*#__PURE__*/React.createElement(ReadOnlyTeamView, {
-    data: roTeam
-  });
-  useEffect(() => {
-    (() => {
-      const st = loadData("praxis-staff", DEFAULT_STAFF);
-      const va = loadData("praxis-vacations", []);
-      const as = loadData(`praxis-${weekKey(weekStart)}`, null);
-      setStaffList(st);
-      setVacations(va);
-      setAssignments(migrateAssignments(as || buildDefault()));
-      setLoaded(true);
-    })();
-  }, []);
-  useEffect(() => {
-    if (!loaded) return;
-    const as = loadData(`praxis-${weekKey(weekStart)}`, null);
-    setAssignments(migrateAssignments(as || buildDefault()));
-  }, [weekStart, loaded]);
   const saveTimer = useRef(null);
-  useEffect(() => {
-    if (!loaded) return;
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(() => {
-      saveData(`praxis-${weekKey(weekStart)}`, assignments);
-      saveData("praxis-staff", staffList);
-      saveData("praxis-vacations", vacations);
-      saveData("praxis-hours", practiceHours);
-      saveData("praxis-requests", vacRequests);
-      saveData("praxis-station-reqs", stationReqs);
-    }, 500);
-    return () => clearTimeout(saveTimer.current);
-  }, [assignments, staffList, vacations, practiceHours, vacRequests, stationReqs, loaded, weekStart]);
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
@@ -3632,6 +3575,63 @@ function Schichtplaner() {
       time: p[3]
     });
   }, []);
+  useEffect(() => {
+    const parseHash = h => {
+      if (h.startsWith("#plan=")) {
+        try {
+          setRoData(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
+          setRoTeam(null);
+        } catch (e) {}
+      } else if (h.startsWith("#team=")) {
+        try {
+          setRoTeam(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
+          setRoData(null);
+        } catch (e) {}
+      } else {
+        setRoData(null);
+        setRoTeam(null);
+      }
+    };
+    parseHash(window.location.hash);
+    const onHash = () => parseHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  useEffect(() => {
+    (() => {
+      const st = loadData("praxis-staff", DEFAULT_STAFF);
+      const va = loadData("praxis-vacations", []);
+      const as = loadData(`praxis-${weekKey(weekStart)}`, null);
+      setStaffList(st);
+      setVacations(va);
+      setAssignments(migrateAssignments(as || buildDefault()));
+      setLoaded(true);
+    })();
+  }, []);
+  useEffect(() => {
+    if (!loaded) return;
+    const as = loadData(`praxis-${weekKey(weekStart)}`, null);
+    setAssignments(migrateAssignments(as || buildDefault()));
+  }, [weekStart, loaded]);
+  useEffect(() => {
+    if (!loaded) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveData(`praxis-${weekKey(weekStart)}`, assignments);
+      saveData("praxis-staff", staffList);
+      saveData("praxis-vacations", vacations);
+      saveData("praxis-hours", practiceHours);
+      saveData("praxis-requests", vacRequests);
+      saveData("praxis-station-reqs", stationReqs);
+    }, 500);
+    return () => clearTimeout(saveTimer.current);
+  }, [assignments, staffList, vacations, practiceHours, vacRequests, stationReqs, loaded, weekStart]);
+  if (roData) return /*#__PURE__*/React.createElement(ReadOnlyView, {
+    data: roData
+  });
+  if (roTeam) return /*#__PURE__*/React.createElement(ReadOnlyTeamView, {
+    data: roTeam
+  });
   const prevWeek = () => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() - 7);
@@ -3715,7 +3715,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.0"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.0.1"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
