@@ -1061,14 +1061,40 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       }
     });
 
-    // SCHRITT 3: Prophylaxe (Zi 5 + Zi 6) - nur ZNP
+    // SCHRITT 3: Steri - muss besetzt sein solange mindestens ein Arzt da ist
+    // Find earliest doctor start and latest doctor end across all rooms
+    var docStart = null,
+      docEnd = null;
+    Object.keys(plan).forEach(function (k) {
+      var p = k.split("-");
+      if (parseInt(p[0]) !== di) return;
+      var sids = plan[k];
+      if (!sids || !sids.length) return;
+      sids.forEach(function (sid) {
+        var person = avail.find(function (a) {
+          return a.id === sid;
+        });
+        if (person && person.roles.indexOf("arzt") >= 0) {
+          if (!docStart || p[3] < docStart) docStart = p[3];
+          var slotEnd = addEnd(p[3]);
+          if (!docEnd || slotEnd > docEnd) docEnd = slotEnd;
+        }
+      });
+    });
+    if (docStart && docEnd) {
+      coverStation("steri", "zfa", docStart, docEnd);
+      // Fallback: try azubi if no ZFA covered it
+      coverStation("steri", "azubi", docStart, docEnd);
+    }
+
+    // SCHRITT 4: Prophylaxe (Zi 5 + Zi 6) - nur ZNP
     ["zi5", "zi6"].forEach(function (stId) {
       coverStation(stId, "znp", openFrom, openTo);
     });
 
-    // SCHRITT 4: Rest (Buero, Steri etc.)
+    // SCHRITT 5: Rest (Buero etc. - Steri schon erledigt)
     stationConfig.forEach(function (sc) {
-      if (sc.id === "empfang" || !sc.reqs) return;
+      if (sc.id === "empfang" || sc.id === "steri" || !sc.reqs) return;
       if (sc.reqs.some(function (r) {
         return r.role === "arzt" && r.min > 0;
       })) return; // arzt rooms done
@@ -1080,7 +1106,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       });
     });
 
-    // SCHRITT 5: Uebrige -> Springer
+    // SCHRITT 6: Uebrige -> Springer
     avail.forEach(function (a) {
       if (weekHours[a.id] >= a.maxH) return;
       var period = getFreePeriod(a, openFrom, openTo);
@@ -4485,7 +4511,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.6"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.7"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
