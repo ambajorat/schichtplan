@@ -1944,6 +1944,472 @@ function AvailabilityEditor({
     }
   }, "Abbrechen")));
 }
+function VacationRequestManager({
+  staffList,
+  requests,
+  onUpdate,
+  vacations,
+  onAddVacation
+}) {
+  var _staffList$;
+  const [staffId, setStaffId] = useState(((_staffList$ = staffList[0]) === null || _staffList$ === void 0 ? void 0 : _staffList$.id) || "");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [note, setNote] = useState("Urlaub");
+  const [comment, setComment] = useState("");
+  var pending = requests.filter(function (r) {
+    return r.status === "pending";
+  });
+  var decided = requests.filter(function (r) {
+    return r.status !== "pending";
+  }).sort(function (a, b) {
+    return b.created.localeCompare(a.created);
+  });
+  function approve(req) {
+    // Add as vacation entry
+    onAddVacation({
+      id: "vac-" + req.id,
+      staffId: req.staffId,
+      from: req.from,
+      to: req.to,
+      note: req.note
+    });
+    onUpdate(requests.map(function (r) {
+      return r.id === req.id ? Object.assign({}, r, {
+        status: "approved",
+        decidedAt: new Date().toISOString().slice(0, 10)
+      }) : r;
+    }));
+  }
+  function reject(req, reason) {
+    onUpdate(requests.map(function (r) {
+      return r.id === req.id ? Object.assign({}, r, {
+        status: "rejected",
+        decidedAt: new Date().toISOString().slice(0, 10),
+        rejectReason: reason || ""
+      }) : r;
+    }));
+  }
+
+  // Count vacation days for overlap check
+  function countWorkdays(f, t) {
+    var d1 = new Date(f + "T00:00:00"),
+      d2 = new Date(t + "T00:00:00"),
+      days = 0;
+    for (var d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
+      var wd = d.getDay();
+      if (wd > 0 && wd < 6) days++;
+    }
+    return days;
+  }
+  function getOverlaps(req) {
+    var overlaps = [];
+    vacations.forEach(function (v) {
+      if (v.from <= req.to && v.to >= req.from) {
+        var s = staffList.find(function (x) {
+          return x.id === v.staffId;
+        });
+        if (s) overlaps.push(s.name + " (" + v.note + ")");
+      }
+    });
+    requests.filter(function (r) {
+      return r.status === "pending" && r.id !== req.id;
+    }).forEach(function (r) {
+      if (r.from <= req.to && r.to >= req.from) {
+        var s = staffList.find(function (x) {
+          return x.id === r.staffId;
+        });
+        if (s) overlaps.push(s.name + " (Antrag)");
+      }
+    });
+    return overlaps;
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Urlaubsanträge ", pending.length > 0 && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      padding: "2px 7px",
+      borderRadius: 10,
+      background: "#e03131",
+      color: "#fff",
+      fontWeight: 700,
+      marginLeft: 6
+    }
+  }, pending.length)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 14,
+      background: "#f8f9fa",
+      borderRadius: 8,
+      marginBottom: 12,
+      border: "1px solid #e9ecef"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "flex-end"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Person"), /*#__PURE__*/React.createElement("select", {
+    value: staffId,
+    onChange: function (e) {
+      setStaffId(e.target.value);
+    },
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  }, staffList.map(function (s) {
+    return /*#__PURE__*/React.createElement("option", {
+      key: s.id,
+      value: s.id
+    }, s.name);
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Von"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: function (e) {
+      setFrom(e.target.value);
+    },
+    style: {
+      padding: "4px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Bis"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: to,
+    onChange: function (e) {
+      setTo(e.target.value);
+    },
+    style: {
+      padding: "4px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Art"), /*#__PURE__*/React.createElement("select", {
+    value: note,
+    onChange: function (e) {
+      setNote(e.target.value);
+    },
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "Urlaub"
+  }, "Urlaub"), /*#__PURE__*/React.createElement("option", {
+    value: "Fortbildung"
+  }, "Fortbildung"), /*#__PURE__*/React.createElement("option", {
+    value: "Sonstiges"
+  }, "Sonstiges"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Bemerkung"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: comment,
+    onChange: function (e) {
+      setComment(e.target.value);
+    },
+    placeholder: "optional",
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      width: 120
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (!staffId || !from || !to) return;
+      var newReq = {
+        id: Date.now().toString(),
+        staffId: staffId,
+        from: from,
+        to: to,
+        note: note,
+        comment: comment,
+        status: "pending",
+        created: new Date().toISOString().slice(0, 10),
+        days: countWorkdays(from, to)
+      };
+      onUpdate([...requests, newReq]);
+      setFrom("");
+      setTo("");
+      setComment("");
+    },
+    style: {
+      padding: "6px 16px",
+      borderRadius: 6,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      height: 30
+    }
+  }, "Antrag stellen"))), pending.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#e03131",
+      marginBottom: 6
+    }
+  }, "Offene Anträge"), pending.map(function (req) {
+    var s = staffList.find(function (x) {
+      return x.id === req.staffId;
+    });
+    var overlaps = getOverlaps(req);
+    return /*#__PURE__*/React.createElement("div", {
+      key: req.id,
+      style: {
+        padding: "10px 14px",
+        borderRadius: 8,
+        border: "2px solid #ffc9c9",
+        background: "#fff5f5",
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: (s === null || s === void 0 ? void 0 : s.color) || "#ccc"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: (s === null || s === void 0 ? void 0 : s.color) || "#495057"
+      }
+    }, (s === null || s === void 0 ? void 0 : s.name) || req.staffId), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#495057",
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, fmtDateDE(req.from), " - ", fmtDateDE(req.to)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        padding: "1px 6px",
+        borderRadius: 4,
+        background: req.note === "Urlaub" ? "#e8f5e9" : "#e3f2fd",
+        color: req.note === "Urlaub" ? "#2e7d32" : "#1565c0",
+        fontWeight: 600
+      }
+    }, req.note), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        color: "#868e96"
+      }
+    }, req.days, " Tage")), req.comment && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#6c757d",
+        marginBottom: 6,
+        fontStyle: "italic"
+      }
+    }, req.comment), overlaps.length > 0 && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#e65100",
+        marginBottom: 6,
+        padding: "3px 8px",
+        background: "#fff3e0",
+        borderRadius: 4
+      }
+    }, "Gleichzeitig abwesend: ", overlaps.join(", ")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        approve(req);
+      },
+      style: {
+        padding: "5px 14px",
+        borderRadius: 5,
+        border: "none",
+        background: "#2e7d32",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, "Genehmigen"), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        var reason = prompt("Ablehnungsgrund (optional):");
+        if (reason !== null) reject(req, reason);
+      },
+      style: {
+        padding: "5px 14px",
+        borderRadius: 5,
+        border: "1px solid #e03131",
+        background: "#fff",
+        color: "#e03131",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, "Ablehnen")));
+  })), decided.length > 0 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6c757d",
+      marginBottom: 6
+    }
+  }, "Entschiedene Anträge"), decided.slice(0, 10).map(function (req) {
+    var s = staffList.find(function (x) {
+      return x.id === req.staffId;
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      key: req.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "6px 10px",
+        borderRadius: 6,
+        border: "1px solid #e9ecef",
+        marginBottom: 3,
+        opacity: 0.7
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 8,
+        height: 8,
+        borderRadius: "50%",
+        background: (s === null || s === void 0 ? void 0 : s.color) || "#ccc"
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        color: (s === null || s === void 0 ? void 0 : s.color) || "#495057"
+      }
+    }, s === null || s === void 0 ? void 0 : s.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#495057"
+      }
+    }, fmtDateDE(req.from), " - ", fmtDateDE(req.to)), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#868e96"
+      }
+    }, req.note), req.status === "approved" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 6px",
+        borderRadius: 3,
+        background: "#e8f5e9",
+        color: "#2e7d32",
+        fontWeight: 600
+      }
+    }, "Genehmigt"), req.status === "rejected" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 6px",
+        borderRadius: 3,
+        background: "#fff0f0",
+        color: "#e03131",
+        fontWeight: 600
+      }
+    }, "Abgelehnt"), req.rejectReason && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#e03131",
+        fontStyle: "italic"
+      }
+    }, req.rejectReason), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        onUpdate(requests.filter(function (r) {
+          return r.id !== req.id;
+        }));
+      },
+      style: {
+        background: "none",
+        border: "none",
+        color: "#ccc",
+        cursor: "pointer",
+        fontSize: 12,
+        fontWeight: 700
+      }
+    }, "×"));
+  })));
+}
 function PracticeHoursManager({
   hours,
   onChange
@@ -2485,8 +2951,8 @@ function VacationManager({
   onAdd,
   onRemove
 }) {
-  var _staffList$;
-  const [staffId, setStaffId] = useState(((_staffList$ = staffList[0]) === null || _staffList$ === void 0 ? void 0 : _staffList$.id) || "");
+  var _staffList$2;
+  const [staffId, setStaffId] = useState(((_staffList$2 = staffList[0]) === null || _staffList$2 === void 0 ? void 0 : _staffList$2.id) || "");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [note, setNote] = useState("Urlaub");
@@ -2978,6 +3444,9 @@ function Schichtplaner() {
   const [practiceHours, setPracticeHours] = useState(function () {
     return loadData("praxis-hours", []);
   });
+  const [vacRequests, setVacRequests] = useState(function () {
+    return loadData("praxis-requests", []);
+  });
   const [shiftModal, setShiftModal] = useState(null);
   const [smFrom, setSmFrom] = useState("08:00");
   const [smTo, setSmTo] = useState("14:00");
@@ -3048,9 +3517,10 @@ function Schichtplaner() {
       saveData("praxis-staff", staffList);
       saveData("praxis-vacations", vacations);
       saveData("praxis-hours", practiceHours);
+      saveData("praxis-requests", vacRequests);
     }, 500);
     return () => clearTimeout(saveTimer.current);
-  }, [assignments, staffList, vacations, practiceHours, loaded, weekStart]);
+  }, [assignments, staffList, vacations, practiceHours, vacRequests, loaded, weekStart]);
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
@@ -3175,7 +3645,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v0.14"))), /*#__PURE__*/React.createElement("div", {
+  }, "v0.15"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -3243,24 +3713,41 @@ function Schichtplaner() {
       borderBottom: "2px solid #e9ecef"
     },
     className: "no-print"
-  }, [["plan", "Schichtplan"], ["vacation", "Urlaub & Abwesenheit"], ["team", "Team & Verfügbarkeit"]].map(([k, label]) => /*#__PURE__*/React.createElement("button", {
-    key: k,
-    onClick: () => {
-      setTab(k);
-      if (k !== "plan") setSelectedStaff(null);
-    },
-    style: {
-      padding: "8px 16px",
-      fontSize: 12,
-      fontWeight: tab === k ? 700 : 500,
-      color: tab === k ? "#212529" : "#868e96",
-      background: "transparent",
-      border: "none",
-      borderBottom: tab === k ? "2px solid #212529" : "2px solid transparent",
-      cursor: "pointer",
-      marginBottom: -2
-    }
-  }, label))), tab === "plan" && /*#__PURE__*/React.createElement("div", {
+  }, [["plan", "Schichtplan"], ["vacation", "Urlaub & Abwesenheit"], ["team", "Team & Verfügbarkeit"]].map(([k, label]) => {
+    var pendingCount = k === "vacation" ? vacRequests.filter(function (r) {
+      return r.status === "pending";
+    }).length : 0;
+    return /*#__PURE__*/React.createElement("button", {
+      key: k,
+      onClick: () => {
+        setTab(k);
+        if (k !== "plan") setSelectedStaff(null);
+      },
+      style: {
+        padding: "8px 16px",
+        fontSize: 12,
+        fontWeight: tab === k ? 700 : 500,
+        color: tab === k ? "#212529" : "#868e96",
+        background: "transparent",
+        border: "none",
+        borderBottom: tab === k ? "2px solid #212529" : "2px solid transparent",
+        cursor: "pointer",
+        marginBottom: -2,
+        position: "relative"
+      }
+    }, label, pendingCount > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 8,
+        background: "#e03131",
+        color: "#fff",
+        fontWeight: 700,
+        marginLeft: 4,
+        verticalAlign: "top"
+      }
+    }, pendingCount));
+  })), tab === "plan" && /*#__PURE__*/React.createElement("div", {
     className: "no-print"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3774,7 +4261,17 @@ function Schichtplaner() {
       color: "#868e96",
       fontSize: 12
     }
-  }, "Person auswählen"))), tab === "vacation" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(PracticeHoursManager, {
+  }, "Person auswählen"))), tab === "vacation" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(VacationRequestManager, {
+    staffList: staffList,
+    requests: vacRequests,
+    onUpdate: setVacRequests,
+    vacations: vacations,
+    onAddVacation: function (v) {
+      setVacations(function (prev) {
+        return [...prev, v];
+      });
+    }
+  }), /*#__PURE__*/React.createElement(PracticeHoursManager, {
     hours: practiceHours,
     onChange: setPracticeHours
   }), /*#__PURE__*/React.createElement(VacationCalendar, {
