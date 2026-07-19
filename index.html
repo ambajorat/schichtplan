@@ -762,41 +762,54 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
   txt += `👤 *${staff.name}* (${hrs} Std.)\n\n`;
   const dayEmoji = ["🟦", "🟧", "🟨", "🟩", "🟪"];
   DAYS.forEach((dn, di) => {
-    const slots = [];
+    // Collect all times per station
+    const stationTimes = {};
     Object.entries(assignments).forEach(([k, sids]) => {
       if (!(sids !== null && sids !== void 0 && sids.includes(staff.id))) return;
       const p = k.split("-");
       if (parseInt(p[0]) !== di) return;
-      slots.push({
-        station: p[1],
-        time: p[3]
-      });
+      const st = p[1],
+        time = p[3];
+      if (!stationTimes[st]) stationTimes[st] = [];
+      if (!stationTimes[st].includes(time)) stationTimes[st].push(time);
     });
-    slots.sort((a, b) => a.time.localeCompare(b.time));
-    if (slots.length === 0) {
+    const stationKeys = Object.keys(stationTimes);
+    if (stationKeys.length === 0) {
       txt += `${dayEmoji[di]} *${dn}:* _frei_\n`;
       return;
     }
-    const groups = [];
-    let cur = null;
-    slots.forEach(sl => {
-      if (cur && cur.station === sl.station) {
-        cur.end = sl.time;
-      } else {
-        if (cur) groups.push(cur);
-        cur = {
-          station: sl.station,
-          start: sl.time,
-          end: sl.time
-        };
+    // For each station, sort times and merge into ranges
+    const parts = [];
+    stationKeys.forEach(st => {
+      const times = stationTimes[st].sort();
+      const ranges = [];
+      let rStart = times[0],
+        rEnd = times[0];
+      for (let i = 1; i < times.length; i++) {
+        if (timeToMin(times[i]) === timeToMin(rEnd) + 30) {
+          rEnd = times[i];
+        } else {
+          ranges.push({
+            start: rStart,
+            end: rEnd
+          });
+          rStart = times[i];
+          rEnd = times[i];
+        }
       }
+      ranges.push({
+        start: rStart,
+        end: rEnd
+      });
+      ranges.forEach(r => parts.push(`${stL[st] || st} ${r.start}–${addEnd(r.end)}`));
     });
-    if (cur) groups.push(cur);
-    const parts = groups.map(g => `${stL[g.station] || g.station} ${g.start}–${addEnd(g.end)}`);
-    txt += `${dayEmoji[di]} *${dn}:*\n`;
-    parts.forEach(p => {
-      txt += `     ${p}\n`;
+    // Sort parts by start time
+    parts.sort((a, b) => {
+      const ta = a.match(/\d{2}:\d{2}/);
+      const tb = b.match(/\d{2}:\d{2}/);
+      return (ta ? ta[0] : "").localeCompare(tb ? tb[0] : "");
     });
+    txt += `${dayEmoji[di]} *${dn}:* ${parts.join(", ")}\n`;
   });
   txt += `\n✅ Gute Woche!`;
   return txt;
