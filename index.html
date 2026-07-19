@@ -757,7 +757,10 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
   wEnd.setDate(wEnd.getDate() + 4);
   const stL = {};
   STATIONS.forEach(x => stL[x.id] = x.label);
-  let txt = `Schichtplan ${fmtDateDE(fmtDate(weekStart))} – ${fmtDateDE(fmtDate(wEnd))}\n${staff.name}\n\n`;
+  const hrs = getWeeklyHours(assignments, staff.id);
+  let txt = `📋 *Schichtplan*\n${fmtDateDE(fmtDate(weekStart))} – ${fmtDateDE(fmtDate(wEnd))}\n\n`;
+  txt += `👤 *${staff.name}* (${hrs} Std.)\n\n`;
+  const dayEmoji = ["🟦", "🟧", "🟨", "🟩", "🟪"];
   DAYS.forEach((dn, di) => {
     const slots = [];
     Object.entries(assignments).forEach(([k, sids]) => {
@@ -771,10 +774,9 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
     });
     slots.sort((a, b) => a.time.localeCompare(b.time));
     if (slots.length === 0) {
-      txt += `${dn}: Frei\n`;
+      txt += `${dayEmoji[di]} *${dn}:* _frei_\n`;
       return;
     }
-    // Group consecutive
     const groups = [];
     let cur = null;
     slots.forEach(sl => {
@@ -791,8 +793,12 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
     });
     if (cur) groups.push(cur);
     const parts = groups.map(g => `${stL[g.station] || g.station} ${g.start}–${addEnd(g.end)}`);
-    txt += `${dn}: ${parts.join(", ")}\n`;
+    txt += `${dayEmoji[di]} *${dn}:*\n`;
+    parts.forEach(p => {
+      txt += `     ${p}\n`;
+    });
   });
+  txt += `\n✅ Gute Woche!`;
   return txt;
 }
 function Chip({
