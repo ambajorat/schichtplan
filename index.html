@@ -4485,7 +4485,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.5"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.6"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -5984,118 +5984,141 @@ function Schichtplaner() {
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      marginBottom: 10
+      marginBottom: 6
     }
   }, /*#__PURE__*/React.createElement("h1", {
     style: {
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: 800,
       margin: 0
     }
   }, "statt-Tipex · Wochenplan"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
+      fontSize: 9,
       color: "#6c757d"
     }
   }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd)))), DAYS.map((dn, di) => {
-    const ds = getDynSlots(assignments, di);
+    // Collect station->people->time ranges
+    const stData = [];
+    STATIONS.forEach(st => {
+      const people = {};
+      Object.entries(assignments).forEach(([k, sids]) => {
+        if (!(sids !== null && sids !== void 0 && sids.length)) return;
+        const p = k.split("-");
+        if (parseInt(p[0]) !== di || p[1] !== st.id) return;
+        sids.forEach(sid => {
+          if (!people[sid]) people[sid] = [];
+          people[sid].push(p[3]);
+        });
+      });
+      const entries = [];
+      Object.entries(people).forEach(([sid, times]) => {
+        times.sort();
+        const ranges = [];
+        let rs = times[0],
+          re = times[0];
+        for (let i = 1; i < times.length; i++) {
+          if (timeToMin(times[i]) === timeToMin(re) + 30) re = times[i];else {
+            ranges.push(rs + "-" + addEnd(re));
+            rs = times[i];
+            re = times[i];
+          }
+        }
+        ranges.push(rs + "-" + addEnd(re));
+        const s = staffList.find(x => x.id === sid);
+        if (s) entries.push({
+          name: s.name,
+          ranges: ranges,
+          isArzt: hasRole(s, "arzt")
+        });
+      });
+      entries.sort((a, b) => (a.ranges[0] || "").localeCompare(b.ranges[0] || ""));
+      if (entries.length > 0) stData.push({
+        label: st.label,
+        entries: entries
+      });
+    });
+    // Absences
+    const dt = new Date(weekStart);
+    dt.setDate(dt.getDate() + di);
+    const ds = fmtDate(dt);
+    const absent = vacations.filter(v => ds >= v.from && ds <= v.to).map(v => {
+      const s = staffList.find(x => x.id === v.staffId);
+      return s ? v.note + ": " + s.name : null;
+    }).filter(Boolean);
     return /*#__PURE__*/React.createElement("div", {
       key: di,
-      className: "print-day"
-    }, /*#__PURE__*/React.createElement("h3", {
+      className: "print-day",
       style: {
-        fontSize: 11,
+        marginBottom: 4
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "baseline",
+        gap: 6,
+        borderBottom: "1.5px solid #333",
+        paddingBottom: 1,
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        fontWeight: 800
+      }
+    }, dn), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        color: "#666"
+      }
+    }, dt.getDate() + "." + (dt.getMonth() + 1) + "."), absent.length > 0 && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 7,
+        color: "#c00"
+      }
+    }, absent.join(" · "))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 2
+      }
+    }, stData.map(sd => /*#__PURE__*/React.createElement("div", {
+      key: sd.label,
+      style: {
+        flex: "1 1 0",
+        minWidth: 80,
+        border: "0.5px solid #ccc",
+        borderRadius: 2,
+        padding: "1px 3px",
+        fontSize: 7,
+        background: "#fafafa"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
         fontWeight: 700,
-        margin: "6px 0 2px",
-        borderBottom: "1px solid #333",
-        paddingBottom: 2
+        fontSize: 7,
+        borderBottom: "0.5px solid #ddd",
+        paddingBottom: 1,
+        marginBottom: 1
       }
-    }, dn, " ", (() => {
-      const dt = new Date(weekStart);
-      dt.setDate(dt.getDate() + di);
-      return dt.getDate() + ".";
-    })()), (() => {
-      const dt = new Date(weekStart);
-      dt.setDate(dt.getDate() + di);
-      const ds = fmtDate(dt);
-      const absent = vacations.filter(v => ds >= v.from && ds <= v.to).map(v => {
-        const s = staffList.find(x => x.id === v.staffId);
-        return s ? {
-          note: v.note,
-          name: s.name
-        } : null;
-      }).filter(Boolean);
-      if (absent.length === 0) return null;
-      const byType = {};
-      absent.forEach(a => {
-        const k = a.note || "Sonstiges";
-        if (!byType[k]) byType[k] = [];
-        byType[k].push(a.name);
-      });
-      return /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontSize: 8,
-          color: "#666",
-          marginBottom: 2
-        }
-      }, Object.entries(byType).map(([t, names]) => `${t}: ${names.join(", ")}`).join(" | "));
-    })(), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    }, sd.label), sd.entries.map((e, ei) => /*#__PURE__*/React.createElement("div", {
+      key: ei,
       style: {
-        width: 36,
-        textAlign: "left"
+        display: "flex",
+        justifyContent: "space-between",
+        gap: 2,
+        lineHeight: 1.3
       }
-    }, "Zeit"), STATIONS.map(st => /*#__PURE__*/React.createElement("th", {
-      key: st.id,
-      colSpan: ds[st.id] || 1,
+    }, /*#__PURE__*/React.createElement("span", {
       style: {
-        textAlign: "center"
+        fontWeight: 600
       }
-    }, st.label)))), /*#__PURE__*/React.createElement("tbody", null, TIME_SLOTS.map(slot => {
-      const hasAny = STATIONS.some(st => {
-        for (let idx = 0; idx < (ds[st.id] || 1); idx++) {
-          var _assignments;
-          if ((_assignments = assignments[`${di}-${st.id}-${idx}-${slot.start}`]) !== null && _assignments !== void 0 && _assignments.length) return true;
-        }
-        return false;
-      });
-      if (!hasAny) return null;
-      return /*#__PURE__*/React.createElement("tr", {
-        key: slot.start
-      }, /*#__PURE__*/React.createElement("td", {
-        style: {
-          fontSize: 7,
-          color: "#666",
-          whiteSpace: "nowrap"
-        }
-      }, slot.start), STATIONS.flatMap(st => Array.from({
-        length: ds[st.id] || 1
-      }, (_, idx) => {
-        const assigned = assignments[`${di}-${st.id}-${idx}-${slot.start}`] || [];
-        return /*#__PURE__*/React.createElement("td", {
-          key: `${st.id}-${idx}`,
-          style: {
-            borderLeft: idx === 0 ? "0.5px solid #ccc" : "0.5px solid #eee"
-          }
-        }, assigned.map(sid => {
-          const s = staffList.find(x => x.id === sid);
-          return s ? /*#__PURE__*/React.createElement("span", {
-            key: sid,
-            className: "print-chip",
-            style: {
-              display: "inline-block",
-              background: s.color + "20",
-              color: s.color,
-              border: `1px solid ${s.color}66`,
-              borderRadius: 3,
-              padding: "0px 3px",
-              fontSize: 7,
-              fontWeight: 600,
-              whiteSpace: "nowrap"
-            }
-          }, s.name) : null;
-        }));
-      })));
-    }))));
+    }, e.isArzt ? "A " : "", e.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#555",
+        whiteSpace: "nowrap"
+      }
+    }, e.ranges.join(", "))))))));
   })));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Schichtplaner));
