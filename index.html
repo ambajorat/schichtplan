@@ -813,10 +813,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
   var sortedConfig = [].concat(stationConfig).sort(function (a, b) {
     return (priority[a.id] || 99) - (priority[b.id] || 99);
   });
-
-  // For each day, assign whole shifts (not individual slots)
   DAYS.forEach(function (_, di) {
-    // Build availability for this day
     var dayAvail = {};
     staffList.forEach(function (s) {
       var av = s.availability ? s.availability[di] : null;
@@ -840,21 +837,66 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
       };
     });
 
-    // Track who is assigned where on this day (person -> station)
-    var dayAssigned = {};
+    // For each station+role requirement, assign a person for a full shift
+    // A person CAN work at multiple stations if their time allows (non-overlapping blocks)
+    // Track assigned time ranges per person: personBusy[sid] = [{from,to}]
+    var personBusy = {};
+    function isPersonFree(sid, from, to) {
+      if (!personBusy[sid]) return true;
+      var fMin = timeToMin(from),
+        tMin = timeToMin(to);
+      for (var i = 0; i < personBusy[sid].length; i++) {
+        var b = personBusy[sid][i];
+        if (fMin < b.to && tMin > b.from) return false; // overlap
+      }
+      return true;
+    }
+    function markBusy(sid, from, to) {
+      if (!personBusy[sid]) personBusy[sid] = [];
+      personBusy[sid].push({
+        from: timeToMin(from),
+        to: timeToMin(to)
+      });
+    }
+    function assignShift(stId, sid, from, to) {
+      var slot = 0;
+      for (var si = 0; si < 10; si++) {
+        var testKey = di + "-" + stId + "-" + si + "-" + from;
+        if (!plan[testKey] || plan[testKey].length === 0) {
+          slot = si;
+          break;
+        }
+      }
+      TIME_SLOTS.forEach(function (ts) {
+        var t = timeToMin(ts.start);
+        if (t >= timeToMin(from) && t < timeToMin(to)) {
+          plan[di + "-" + stId + "-" + slot + "-" + ts.start] = [sid];
+        }
+      });
+      var hrs = (timeToMin(to) - timeToMin(from)) / 60;
+      weekHours[sid] += hrs;
+      markBusy(sid, from, to);
+    }
 
-    // Pass 1: Arzt requirements (whole shifts)
+    // Process each station in priority order
     sortedConfig.forEach(function (sc) {
       if (!sc.reqs) return;
-      sc.reqs.forEach(function (req) {
-        if (req.role !== "arzt" || req.min <= 0) return;
-        // Find available doctors for this station
+      var hasArztReq = sc.reqs.some(function (r) {
+        return r.role === "arzt" && r.min > 0;
+      });
+
+      // First: try to assign doctors
+      if (hasArztReq) {
+        var arztReq = sc.reqs.find(function (r) {
+          return r.role === "arzt";
+        });
+        var arztFilled = 0;
         var candidates = [];
         Object.keys(dayAvail).forEach(function (sid) {
           var da = dayAvail[sid];
           if (da.rooms.indexOf(sc.id) < 0) return;
           if (da.roles.indexOf("arzt") < 0) return;
-          if (dayAssigned[sid]) return; // already assigned today
+          if (!isPersonFree(sid, da.from, da.to)) return;
           if (weekHours[sid] >= da.maxH) return;
           candidates.push({
             id: sid,
@@ -866,59 +908,22 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         candidates.sort(function (a, b) {
           return a.hours - b.hours;
         });
-        for (var ci = 0; ci < candidates.length && ci < req.min; ci++) {
-          var c = candidates[ci];
-          var slot = 0;
-          // Find free slot index for this station
-          for (var si = 0; si < 10; si++) {
-            var testKey = di + "-" + sc.id + "-" + si + "-" + c.from;
-            if (!plan[testKey] || plan[testKey].length === 0) {
-              slot = si;
-              break;
-            }
-          }
-          // Assign for full availability window
-          TIME_SLOTS.forEach(function (ts) {
-            var t = timeToMin(ts.start);
-            if (t >= timeToMin(c.from) && t < timeToMin(c.to)) {
-              plan[di + "-" + sc.id + "-" + slot + "-" + ts.start] = [c.id];
-            }
-          });
-          var shiftHours = (timeToMin(c.to) - timeToMin(c.from)) / 60;
-          weekHours[c.id] += shiftHours;
-          dayAssigned[c.id] = sc.id;
+        for (var ci = 0; ci < candidates.length && arztFilled < arztReq.min; ci++) {
+          assignShift(sc.id, candidates[ci].id, candidates[ci].from, candidates[ci].to);
+          arztFilled++;
         }
-      });
-    });
-
-    // Pass 2: non-Arzt roles (whole shifts), only where doctor present if required
-    sortedConfig.forEach(function (sc) {
-      if (!sc.reqs) return;
-      var needsDoctor = sc.reqs.some(function (r) {
-        return r.role === "arzt" && r.min > 0;
-      });
-      if (needsDoctor) {
-        // Check if a doctor was assigned to this station
-        var hasDoc = false;
-        Object.keys(dayAssigned).forEach(function (sid) {
-          if (dayAssigned[sid] === sc.id && dayAvail[sid] && dayAvail[sid].roles.indexOf("arzt") >= 0) hasDoc = true;
-        });
-        if (!hasDoc) return;
       }
+
+      // Then: assign all other roles (regardless of whether doctor was found)
       sc.reqs.forEach(function (req) {
         if (req.role === "arzt" || req.min <= 0) return;
         var filled = 0;
-        // Count already assigned with this role at this station
-        Object.keys(dayAssigned).forEach(function (sid) {
-          if (dayAssigned[sid] === sc.id && dayAvail[sid] && dayAvail[sid].roles.indexOf(req.role) >= 0) filled++;
-        });
-        if (filled >= req.min) return;
         var candidates = [];
         Object.keys(dayAvail).forEach(function (sid) {
           var da = dayAvail[sid];
           if (da.rooms.indexOf(sc.id) < 0) return;
           if (da.roles.indexOf(req.role) < 0) return;
-          if (dayAssigned[sid]) return;
+          if (!isPersonFree(sid, da.from, da.to)) return;
           if (weekHours[sid] >= da.maxH) return;
           candidates.push({
             id: sid,
@@ -931,24 +936,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
           return a.hours - b.hours;
         });
         for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
-          var c = candidates[ci];
-          var slot = 0;
-          for (var si = 0; si < 10; si++) {
-            var testKey = di + "-" + sc.id + "-" + si + "-" + c.from;
-            if (!plan[testKey] || plan[testKey].length === 0) {
-              slot = si;
-              break;
-            }
-          }
-          TIME_SLOTS.forEach(function (ts) {
-            var t = timeToMin(ts.start);
-            if (t >= timeToMin(c.from) && t < timeToMin(c.to)) {
-              plan[di + "-" + sc.id + "-" + slot + "-" + ts.start] = [c.id];
-            }
-          });
-          var shiftHours = (timeToMin(c.to) - timeToMin(c.from)) / 60;
-          weekHours[c.id] += shiftHours;
-          dayAssigned[c.id] = sc.id;
+          assignShift(sc.id, candidates[ci].id, candidates[ci].from, candidates[ci].to);
           filled++;
         }
       });
@@ -4318,7 +4306,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.4"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.6"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -5280,6 +5268,94 @@ function Schichtplaner() {
       letterSpacing: 0.5
     }
   }, "Einstellungen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#6c757d",
+      marginBottom: 4
+    }
+  }, "Daten sichern & wiederherstellen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var backup = {};
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.startsWith("praxis")) backup[k] = JSON.parse(localStorage.getItem(k));
+      }
+      var blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json"
+      });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "statt-tipex-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    style: {
+      padding: "6px 14px",
+      borderRadius: 6,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Exportieren"), /*#__PURE__*/React.createElement("label", {
+    style: {
+      padding: "6px 14px",
+      borderRadius: 6,
+      border: "1px solid #212529",
+      background: "#fff",
+      color: "#212529",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Importieren", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".json",
+    style: {
+      display: "none"
+    },
+    onChange: function (e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        try {
+          var data = JSON.parse(ev.target.result);
+          var count = 0;
+          Object.keys(data).forEach(function (k) {
+            localStorage.setItem(k, JSON.stringify(data[k]));
+            count++;
+          });
+          alert(count + " Einstellungen wiederhergestellt. Seite wird neu geladen.");
+          window.location.reload();
+        } catch (err) {
+          alert("Fehler beim Import: " + err.message);
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = "";
+    }
+  })), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#868e96"
+    }
+  }, "Sichert Team, Rollen, Urlaube, Schichten und alle Einstellungen."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
