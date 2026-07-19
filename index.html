@@ -12,6 +12,7 @@
 </style>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -856,7 +857,7 @@ function buildPersonLink(assignments, staff, weekStart) {
     h: getWeeklyHours(assignments, staff.id),
     s: schedule
   };
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(data));
   const base = window.location.origin + window.location.pathname;
   return base + "#plan=" + encoded;
 }
@@ -896,7 +897,7 @@ function buildTeamLink(assignments, staffList, weekStart) {
     w: fmtDateDE(fmtDate(weekStart)) + " - " + fmtDateDE(fmtDate(wEnd)),
     d: parts.join(";")
   };
-  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const encoded = LZString.compressToEncodedURIComponent(JSON.stringify(data));
   return window.location.origin + window.location.pathname + "#team=" + encoded;
 }
 function ReadOnlyTeamView({
@@ -2098,12 +2099,12 @@ function Schichtplaner() {
     const parseHash = h => {
       if (h.startsWith("#plan=")) {
         try {
-          setRoData(JSON.parse(decodeURIComponent(escape(atob(h.slice(6))))));
+          setRoData(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
           setRoTeam(null);
         } catch (e) {}
       } else if (h.startsWith("#team=")) {
         try {
-          setRoTeam(JSON.parse(decodeURIComponent(escape(atob(h.slice(6))))));
+          setRoTeam(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
           setRoData(null);
         } catch (e) {}
       } else {
@@ -2285,7 +2286,11 @@ function Schichtplaner() {
       fontSize: 11,
       color: "#868e96"
     }
-  }, "Schichtplaner · Zahnarztpraxis")), /*#__PURE__*/React.createElement("div", {
+  }, "Schichtplaner · Zahnarztpraxis · ", /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, "v0.9"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
