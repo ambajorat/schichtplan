@@ -633,7 +633,8 @@ function timeToMin(t) {
   return h * 60 + m;
 }
 function isAvailable(staff, dayIdx, time, vacations, weekStartStr) {
-  const av = staff.availability?.[dayIdx];
+  var _staff$availability;
+  const av = (_staff$availability = staff.availability) === null || _staff$availability === void 0 ? void 0 : _staff$availability[dayIdx];
   if (!av) return false;
   const t = timeToMin(time);
   if (t < timeToMin(av.from) || t >= timeToMin(av.to)) return false;
@@ -650,7 +651,7 @@ function isAvailable(staff, dayIdx, time, vacations, weekStartStr) {
 function findConflicts(assignments) {
   const ps = {};
   Object.entries(assignments).forEach(([key, sids]) => {
-    if (!sids?.length) return;
+    if (!(sids !== null && sids !== void 0 && sids.length)) return;
     const [day,,, time] = key.split("-");
     sids.forEach(sid => {
       const pk = `${sid}-${day}-${time}`;
@@ -669,7 +670,7 @@ function findViolations(assignments, staffList, vacations, weekStartStr) {
   const sm = {};
   staffList.forEach(s => sm[s.id] = s);
   Object.entries(assignments).forEach(([key, sids]) => {
-    if (!sids?.length) return;
+    if (!(sids !== null && sids !== void 0 && sids.length)) return;
     const p = key.split("-");
     const day = parseInt(p[0]),
       time = p[3];
@@ -683,7 +684,7 @@ function findViolations(assignments, staffList, vacations, weekStartStr) {
 function getWeeklyHours(assignments, staffId) {
   let c = 0;
   Object.values(assignments).forEach(sids => {
-    if (sids?.includes(staffId)) c++;
+    if (sids !== null && sids !== void 0 && sids.includes(staffId)) c++;
   });
   return (c * 0.5).toFixed(1);
 }
@@ -691,7 +692,7 @@ function getPersonWeek(assignments, staffId) {
   const week = {};
   DAYS.forEach((_, i) => week[i] = []);
   Object.entries(assignments).forEach(([key, sids]) => {
-    if (!sids?.includes(staffId)) return;
+    if (!(sids !== null && sids !== void 0 && sids.includes(staffId))) return;
     const p = key.split("-");
     week[parseInt(p[0])].push({
       station: p[1],
@@ -834,11 +835,12 @@ function StationGrid({
   }, slot.label), STATIONS.flatMap(st => Array.from({
     length: st.slots
   }, (_, idx) => {
+    var _staffList$find;
     const key = `${day}-${st.id}-${idx}-${slot.start}`;
     const assigned = assignments[key] || [];
     const isCon = conflicts.has(key),
       isVio = violations.has(key);
-    const selColor = selectedStaff ? staffList.find(x => x.id === selectedStaff)?.color : null;
+    const selColor = selectedStaff ? (_staffList$find = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find === void 0 ? void 0 : _staffList$find.color : null;
     return /*#__PURE__*/React.createElement("td", {
       key: `${st.id}-${idx}`,
       onClick: () => onCellClick(key),
@@ -932,7 +934,8 @@ function PersonView({
       flexWrap: "wrap"
     }
   }, DAYS.map((dn, di) => {
-    const av = s.availability?.[di];
+    var _s$availability;
+    const av = (_s$availability = s.availability) === null || _s$availability === void 0 ? void 0 : _s$availability[di];
     return /*#__PURE__*/React.createElement("span", {
       key: di,
       style: {
@@ -1021,9 +1024,10 @@ function AvailabilityEditor({
   onSave,
   onCancel
 }) {
+  var _staff$vacDays;
   const [av, setAv] = useState(JSON.parse(JSON.stringify(staff.availability || {})));
   const [maxH, setMaxH] = useState(staff.maxHours || 40);
-  const [vDays, setVDays] = useState(staff.vacDays ?? 26);
+  const [vDays, setVDays] = useState((_staff$vacDays = staff.vacDays) !== null && _staff$vacDays !== void 0 ? _staff$vacDays : 26);
   const toggle = di => {
     const n = {
       ...av
@@ -1210,7 +1214,8 @@ function VacationManager({
   onAdd,
   onRemove
 }) {
-  const [staffId, setStaffId] = useState(staffList[0]?.id || "");
+  var _staffList$;
+  const [staffId, setStaffId] = useState(((_staffList$ = staffList[0]) === null || _staffList$ === void 0 ? void 0 : _staffList$.id) || "");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [note, setNote] = useState("Urlaub");
@@ -1218,8 +1223,9 @@ function VacationManager({
   const today = new Date().toISOString().slice(0, 10);
   const vacDays = {};
   staffList.forEach(s => {
+    var _s$vacDays;
     vacDays[s.id] = {
-      total: s.vacDays ?? 26,
+      total: (_s$vacDays = s.vacDays) !== null && _s$vacDays !== void 0 ? _s$vacDays : 26,
       used: 0
     };
   });
@@ -1382,8 +1388,9 @@ function VacationManager({
       gap: 4
     }
   }, staffList.map(s => {
+    var _s$vacDays2;
     const vd = vacDays[s.id] || {
-      total: s.vacDays ?? 26,
+      total: (_s$vacDays2 = s.vacDays) !== null && _s$vacDays2 !== void 0 ? _s$vacDays2 : 26,
       used: 0
     };
     const remaining = vd.total - vd.used;
@@ -1494,17 +1501,17 @@ function VacationManager({
         width: 8,
         height: 8,
         borderRadius: "50%",
-        background: s?.color || "#ccc",
+        background: (s === null || s === void 0 ? void 0 : s.color) || "#ccc",
         flexShrink: 0
       }
     }), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 12,
         fontWeight: 600,
-        color: s?.color || "#495057",
+        color: (s === null || s === void 0 ? void 0 : s.color) || "#495057",
         minWidth: 80
       }
-    }, s?.name || v.staffId), /*#__PURE__*/React.createElement("span", {
+    }, (s === null || s === void 0 ? void 0 : s.name) || v.staffId), /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 11,
         color: "#495057",
@@ -1538,6 +1545,7 @@ function VacationManager({
   })));
 }
 function Schichtplaner() {
+  var _STATIONS$find, _STATIONS$find2;
   const [loaded, setLoaded] = useState(false);
   const [staffList, setStaffList] = useState(DEFAULT_STAFF);
   const [assignments, setAssignments] = useState({});
@@ -1582,20 +1590,63 @@ function Schichtplaner() {
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
-  const handleCellClick = useCallback(key => {
-    if (selectedStaff) {
-      setAssignments(prev => {
-        const n = {
-          ...prev
-        };
+
+  // Shift entry state
+  const [shiftStaff, setShiftStaff] = useState("");
+  const [shiftStation, setShiftStation] = useState("empfang");
+  const [shiftSlot, setShiftSlot] = useState(0);
+  const [shiftFrom, setShiftFrom] = useState("08:00");
+  const [shiftTo, setShiftTo] = useState("14:00");
+  const addShift = useCallback(() => {
+    if (!shiftStaff) return;
+    setAssignments(prev => {
+      const n = {
+        ...prev
+      };
+      TIME_SLOTS.filter(s => s.start >= shiftFrom && s.start < shiftTo).forEach(slot => {
+        const key = `${activeDay}-${shiftStation}-${shiftSlot}-${slot.start}`;
         const c = n[key] || [];
-        if (c.includes(selectedStaff)) {
-          n[key] = c.filter(id => id !== selectedStaff);
-          if (!n[key].length) delete n[key];
-        } else n[key] = [...c, selectedStaff];
-        return n;
+        if (!c.includes(shiftStaff)) n[key] = [...c, shiftStaff];
       });
-    } else setEditingCell(key);
+      return n;
+    });
+  }, [shiftStaff, shiftStation, shiftSlot, shiftFrom, shiftTo, activeDay]);
+  const removeShift = useCallback(() => {
+    if (!shiftStaff) return;
+    setAssignments(prev => {
+      const n = {
+        ...prev
+      };
+      TIME_SLOTS.filter(s => s.start >= shiftFrom && s.start < shiftTo).forEach(slot => {
+        const key = `${activeDay}-${shiftStation}-${shiftSlot}-${slot.start}`;
+        const c = n[key] || [];
+        n[key] = c.filter(id => id !== shiftStaff);
+        if (!n[key].length) delete n[key];
+      });
+      return n;
+    });
+  }, [shiftStaff, shiftStation, shiftSlot, shiftFrom, shiftTo, activeDay]);
+  const handleCellClick = useCallback(key => {
+    const p = key.split("-");
+    const day = parseInt(p[0]);
+    const station = p[1];
+    const slotIdx = parseInt(p[2]);
+    const time = p[3];
+    if (selectedStaff) {
+      // Pre-fill shift form from clicked cell
+      setShiftStaff(selectedStaff);
+      setShiftStation(station);
+      setShiftSlot(slotIdx);
+      setShiftFrom(time);
+      // Auto-set end to a reasonable default if start changed
+      const fromMin = timeToMin(time);
+      const toMin = fromMin + 360; // 6 hours default
+      const endH = Math.min(Math.floor(toMin / 60), 20);
+      const endM = toMin % 60;
+      setShiftTo(`${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`);
+    } else {
+      setEditingCell(key);
+    }
   }, [selectedStaff]);
   const removeFromCell = useCallback((ck, sid) => {
     setAssignments(prev => {
@@ -1858,72 +1909,167 @@ function Schichtplaner() {
     style: {
       display: "flex",
       flexWrap: "wrap",
-      gap: 3,
-      marginBottom: 8,
-      padding: "6px 8px",
+      gap: 6,
+      marginBottom: 10,
+      padding: "10px 12px",
       background: "#f8f9fa",
-      borderRadius: 7,
-      alignItems: "center"
+      borderRadius: 8,
+      alignItems: "flex-end",
+      border: "1px solid #e9ecef"
     }
-  }, /*#__PURE__*/React.createElement("span", {
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
-      fontSize: 9.5,
-      color: "#868e96",
-      fontWeight: 600,
-      marginRight: 3
-    }
-  }, "Zuweisen:"), staffList.map(s => {
-    const avail = isAvailable(s, activeDay, "08:00", vacations, wsStr);
-    return /*#__PURE__*/React.createElement("button", {
-      key: s.id,
-      onClick: () => setSelectedStaff(selectedStaff === s.id ? null : s.id),
-      style: {
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 3,
-        padding: "2px 7px",
-        borderRadius: 5,
-        border: selectedStaff === s.id ? `2px solid ${s.color}` : "1.5px solid #dee2e6",
-        background: selectedStaff === s.id ? s.color + "18" : "#fff",
-        color: avail ? s.color : "#bbb",
-        fontSize: 10.5,
-        fontWeight: 600,
-        cursor: "pointer",
-        opacity: avail ? 1 : 0.45,
-        textDecoration: avail ? "none" : "line-through"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        width: 6,
-        height: 6,
-        borderRadius: "50%",
-        background: avail ? s.color : "#ccc"
-      }
-    }), s.name);
-  }), selectedStaff && /*#__PURE__*/React.createElement("button", {
-    onClick: () => setSelectedStaff(null),
-    style: {
-      padding: "2px 7px",
-      borderRadius: 5,
-      border: "1.5px solid #e03131",
-      background: "#fff0f0",
-      color: "#e03131",
       fontSize: 10,
       fontWeight: 600,
-      cursor: "pointer",
-      marginLeft: 3
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 2
     }
-  }, "✕")), selectedStaff && /*#__PURE__*/React.createElement("div", {
+  }, "Person"), /*#__PURE__*/React.createElement("select", {
+    value: shiftStaff,
+    onChange: e => {
+      setShiftStaff(e.target.value);
+      setSelectedStaff(e.target.value || null);
+    },
     style: {
-      marginBottom: 6,
-      padding: "5px 10px",
-      background: (staffList.find(x => x.id === selectedStaff)?.color || "#000") + "10",
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
       borderRadius: 5,
-      fontSize: 10.5,
-      color: staffList.find(x => x.id === selectedStaff)?.color,
-      fontWeight: 500
+      fontSize: 12,
+      minWidth: 100
     }
-  }, "Klicke auf Zellen um ", /*#__PURE__*/React.createElement("strong", null, staffList.find(x => x.id === selectedStaff)?.name), " zuzuweisen / entfernen"), /*#__PURE__*/React.createElement(StationGrid, {
+  }, /*#__PURE__*/React.createElement("option", {
+    value: ""
+  }, "—"), staffList.map(s => {
+    const avail = isAvailable(s, activeDay, "08:00", vacations, wsStr);
+    return /*#__PURE__*/React.createElement("option", {
+      key: s.id,
+      value: s.id,
+      style: {
+        color: avail ? "#212529" : "#bbb"
+      }
+    }, s.name, avail ? "" : " (nicht verfügbar)");
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Station"), /*#__PURE__*/React.createElement("select", {
+    value: shiftStation,
+    onChange: e => setShiftStation(e.target.value),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  }, STATIONS.map(st => /*#__PURE__*/React.createElement("option", {
+    key: st.id,
+    value: st.id
+  }, st.label)))), (((_STATIONS$find = STATIONS.find(s => s.id === shiftStation)) === null || _STATIONS$find === void 0 ? void 0 : _STATIONS$find.slots) || 1) > 1 && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Platz"), /*#__PURE__*/React.createElement("select", {
+    value: shiftSlot,
+    onChange: e => setShiftSlot(parseInt(e.target.value)),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  }, Array.from({
+    length: ((_STATIONS$find2 = STATIONS.find(s => s.id === shiftStation)) === null || _STATIONS$find2 === void 0 ? void 0 : _STATIONS$find2.slots) || 1
+  }, (_, i) => /*#__PURE__*/React.createElement("option", {
+    key: i,
+    value: i
+  }, i + 1)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Von"), /*#__PURE__*/React.createElement("select", {
+    value: shiftFrom,
+    onChange: e => setShiftFrom(e.target.value),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, TIME_SLOTS.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.start,
+    value: s.start
+  }, s.start)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Bis"), /*#__PURE__*/React.createElement("select", {
+    value: shiftTo,
+    onChange: e => setShiftTo(e.target.value),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, TIME_SLOTS.filter(s => s.start > shiftFrom).map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.start,
+    value: s.start
+  }, s.start)), /*#__PURE__*/React.createElement("option", {
+    value: "20:00"
+  }, "20:00"))), /*#__PURE__*/React.createElement("button", {
+    onClick: addShift,
+    disabled: !shiftStaff,
+    style: {
+      padding: "6px 14px",
+      borderRadius: 6,
+      border: "none",
+      background: shiftStaff ? "#212529" : "#dee2e6",
+      color: shiftStaff ? "#fff" : "#868e96",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: shiftStaff ? "pointer" : "default",
+      height: 30
+    }
+  }, "+ Schicht eintragen"), /*#__PURE__*/React.createElement("button", {
+    onClick: removeShift,
+    disabled: !shiftStaff,
+    style: {
+      padding: "6px 14px",
+      borderRadius: 6,
+      border: "1px solid #e03131",
+      background: "#fff",
+      color: shiftStaff ? "#e03131" : "#ccc",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: shiftStaff ? "pointer" : "default",
+      height: 30
+    }
+  }, "Entfernen"), shiftStaff && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 10,
+      color: "#868e96",
+      fontStyle: "italic"
+    }
+  }, "oder klicke eine Zelle um Startzeit zu setzen")), /*#__PURE__*/React.createElement(StationGrid, {
     day: activeDay,
     assignments: assignments,
     conflicts: conflicts,
@@ -2035,76 +2181,80 @@ function Schichtplaner() {
       gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
       gap: 8
     }
-  }, staffList.map(s => /*#__PURE__*/React.createElement("div", {
-    key: s.id,
-    onClick: () => setEditingAv(s),
-    style: {
-      padding: 12,
-      borderRadius: 8,
-      border: "1px solid #e9ecef",
-      cursor: "pointer",
-      background: "#fff",
-      transition: "border-color 0.12s"
-    },
-    onMouseEnter: e => e.currentTarget.style.borderColor = s.color,
-    onMouseLeave: e => e.currentTarget.style.borderColor = "#e9ecef"
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      marginBottom: 8
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      width: 28,
-      height: 28,
-      borderRadius: 7,
-      background: s.color + "20",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      fontSize: 13,
-      fontWeight: 700,
-      color: s.color
-    }
-  }, s.name[0]), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontWeight: 700,
-      fontSize: 13
-    }
-  }, s.name), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "#868e96"
-    }
-  }, "max. ", s.maxHours, "h / Woche · ", s.vacDays ?? 26, " Urlaubstage · ", getWeeklyHours(assignments, s.id), "h geplant"))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 3,
-      flexWrap: "wrap"
-    }
-  }, DAYS.map((d, di) => {
-    const av = s.availability?.[di];
-    return /*#__PURE__*/React.createElement("span", {
-      key: di,
+  }, staffList.map(s => {
+    var _s$vacDays3;
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      onClick: () => setEditingAv(s),
       style: {
-        fontSize: 9,
-        padding: "2px 5px",
-        borderRadius: 4,
-        background: av ? s.color + "10" : "#f5f5f5",
-        color: av ? s.color : "#ccc",
-        fontWeight: 600
+        padding: 12,
+        borderRadius: 8,
+        border: "1px solid #e9ecef",
+        cursor: "pointer",
+        background: "#fff",
+        transition: "border-color 0.12s"
+      },
+      onMouseEnter: e => e.currentTarget.style.borderColor = s.color,
+      onMouseLeave: e => e.currentTarget.style.borderColor = "#e9ecef"
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 8
       }
-    }, DAY_SHORT[di], av ? ` ${av.from}–${av.to}` : "");
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginTop: 6,
-      fontSize: 10,
-      color: s.color,
-      fontWeight: 500
-    }
-  }, "✎ Bearbeiten"))))), editingCell && !selectedStaff && tab === "plan" && /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 28,
+        height: 28,
+        borderRadius: 7,
+        background: s.color + "20",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        color: s.color
+      }
+    }, s.name[0]), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontWeight: 700,
+        fontSize: 13
+      }
+    }, s.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#868e96"
+      }
+    }, "max. ", s.maxHours, "h / Woche · ", (_s$vacDays3 = s.vacDays) !== null && _s$vacDays3 !== void 0 ? _s$vacDays3 : 26, " Urlaubstage · ", getWeeklyHours(assignments, s.id), "h geplant"))), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "flex",
+        gap: 3,
+        flexWrap: "wrap"
+      }
+    }, DAYS.map((d, di) => {
+      var _s$availability2;
+      const av = (_s$availability2 = s.availability) === null || _s$availability2 === void 0 ? void 0 : _s$availability2[di];
+      return /*#__PURE__*/React.createElement("span", {
+        key: di,
+        style: {
+          fontSize: 9,
+          padding: "2px 5px",
+          borderRadius: 4,
+          background: av ? s.color + "10" : "#f5f5f5",
+          color: av ? s.color : "#ccc",
+          fontWeight: 600
+        }
+      }, DAY_SHORT[di], av ? ` ${av.from}–${av.to}` : "");
+    })), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 6,
+        fontSize: 10,
+        color: s.color,
+        fontWeight: 500
+      }
+    }, "✎ Bearbeiten"));
+  }))), editingCell && !selectedStaff && tab === "plan" && /*#__PURE__*/React.createElement("div", {
     onClick: () => setEditingCell(null),
     style: {
       position: "fixed",
@@ -2154,9 +2304,9 @@ function Schichtplaner() {
       color: "#868e96",
       marginBottom: 8
     }
-  }, (() => {
+  }, (_STATIONS$find3 => {
     const p = editingCell.split("-");
-    return `${DAYS[p[0]]} · ${STATIONS.find(s => s.id === p[1])?.label || p[1]} · ${p[3]}`;
+    return `${DAYS[p[0]]} · ${((_STATIONS$find3 = STATIONS.find(s => s.id === p[1])) === null || _STATIONS$find3 === void 0 ? void 0 : _STATIONS$find3.label) || p[1]} · ${p[3]}`;
   })()), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
