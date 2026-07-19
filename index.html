@@ -22,31 +22,40 @@ const DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"];
 const DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr"];
 const STATIONS = [{
   id: "empfang",
-  label: "Empfang"
+  label: "Empfang",
+  minStaff: 1
 }, {
   id: "buero",
-  label: "Büro"
+  label: "Büro",
+  minStaff: 1
 }, {
   id: "zi1",
-  label: "Zi 1"
+  label: "Zi 1",
+  minStaff: 1
 }, {
   id: "zi2",
-  label: "Zi 2"
+  label: "Zi 2",
+  minStaff: 0
 }, {
   id: "zi3",
-  label: "Zi 3"
+  label: "Zi 3",
+  minStaff: 1
 }, {
   id: "zi4",
-  label: "Zi 4"
+  label: "Zi 4",
+  minStaff: 0
 }, {
   id: "zi5",
-  label: "Zi 5"
+  label: "Zi 5",
+  minStaff: 1
 }, {
   id: "zi6",
-  label: "Zi 6"
+  label: "Zi 6",
+  minStaff: 0
 }, {
   id: "steri",
-  label: "Steri"
+  label: "Steri",
+  minStaff: 1
 }];
 function genSlots() {
   const s = [];
@@ -752,6 +761,106 @@ function findFreeSlot(assignments, day, station, from, to) {
   return 0;
 }
 
+// Auto-scheduler: generate a week plan based on station requirements and staff availability
+function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
+  const plan = {};
+  const weekHours = {}; // track hours per person
+  staffList.forEach(function (s) {
+    weekHours[s.id] = 0;
+  });
+
+  // For each day
+  DAYS.forEach(function (_, di) {
+    // Build list of available staff for this day
+    const dayAvail = {};
+    staffList.forEach(function (s) {
+      const av = s.availability ? s.availability[di] : null;
+      if (!av) return;
+      // Check vacation
+      const dt = new Date(weekStartStr + "T00:00:00");
+      dt.setDate(dt.getDate() + di);
+      const ds = dt.toISOString().slice(0, 10);
+      var onLeave = false;
+      vacations.forEach(function (v) {
+        if (v.staffId === s.id && ds >= v.from && ds <= v.to) onLeave = true;
+      });
+      if (onLeave) return;
+      dayAvail[s.id] = {
+        from: av.from,
+        to: av.to,
+        rooms: s.rooms || STATIONS.map(function (x) {
+          return x.id;
+        }),
+        maxH: s.maxHours || 40
+      };
+    });
+
+    // For each time slot on this day
+    TIME_SLOTS.forEach(function (slot) {
+      const t = timeToMin(slot.start);
+
+      // For each station, check if we need to fill it
+      stationConfig.forEach(function (sc) {
+        var needed = sc.min;
+        if (needed <= 0) return;
+
+        // How many already assigned at this station+time?
+        var filled = 0;
+        for (var si = 0; si < 10; si++) {
+          var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
+          if (plan[k] && plan[k].length > 0) filled++;
+        }
+        if (filled >= needed) return;
+
+        // Find candidates: available at this time, allowed for this station, not already working this slot
+        var candidates = [];
+        Object.keys(dayAvail).forEach(function (sid) {
+          var da = dayAvail[sid];
+          if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
+          if (da.rooms.indexOf(sc.id) < 0) return;
+          // Check not already assigned at this time slot on any station
+          var busy = false;
+          STATIONS.forEach(function (st2) {
+            for (var si2 = 0; si2 < 10; si2++) {
+              var k2 = di + "-" + st2.id + "-" + si2 + "-" + slot.start;
+              if (plan[k2] && plan[k2].indexOf(sid) >= 0) busy = true;
+            }
+          });
+          if (busy) return;
+          // Check max hours not exceeded
+          if (weekHours[sid] >= da.maxH) return;
+          candidates.push({
+            id: sid,
+            hours: weekHours[sid]
+          });
+        });
+
+        // Sort by fewest hours (fair distribution)
+        candidates.sort(function (a, b) {
+          return a.hours - b.hours;
+        });
+
+        // Assign as many as still needed
+        for (var ci = 0; ci < candidates.length && filled < needed; ci++) {
+          var slot2 = 0;
+          for (var si3 = 0; si3 < 10; si3++) {
+            var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
+            if (!plan[k3] || plan[k3].length === 0) {
+              slot2 = si3;
+              break;
+            }
+          }
+          var key = di + "-" + sc.id + "-" + slot2 + "-" + slot.start;
+          plan[key] = [candidates[ci].id];
+          weekHours[candidates[ci].id] += 0.5;
+          filled++;
+        }
+      });
+    });
+  });
+  return plan;
+}
+
 // Generate text schedule for one person for the week
 function personScheduleText(assignments, staff, staffList, weekStart) {
   const wEnd = new Date(weekStart);
@@ -1434,6 +1543,9 @@ function AvailabilityEditor({
   const [av, setAv] = useState(JSON.parse(JSON.stringify(staff.availability || {})));
   const [maxH, setMaxH] = useState(staff.maxHours || 40);
   const [vDays, setVDays] = useState((_staff$vacDays = staff.vacDays) !== null && _staff$vacDays !== void 0 ? _staff$vacDays : 26);
+  const [rooms, setRooms] = useState(staff.rooms || STATIONS.map(function (s) {
+    return s.id;
+  }));
   const toggle = di => {
     const n = {
       ...av
@@ -1453,6 +1565,11 @@ function AvailabilityEditor({
       [f]: val
     };
     setAv(n);
+  };
+  const toggleRoom = id => {
+    setRooms(prev => prev.includes(id) ? prev.filter(function (x) {
+      return x !== id;
+    }) : prev.concat([id]));
   };
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1527,7 +1644,83 @@ function AvailabilityEditor({
       fontSize: 13,
       marginTop: 3
     }
-  }))), DAYS.map((d, di) => /*#__PURE__*/React.createElement("div", {
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#6c757d",
+      fontWeight: 600,
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Zugelassene Stationen / Räume"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 4
+    }
+  }, STATIONS.map(function (st) {
+    var active = rooms.includes(st.id);
+    return /*#__PURE__*/React.createElement("button", {
+      key: st.id,
+      onClick: function () {
+        toggleRoom(st.id);
+      },
+      style: {
+        padding: "4px 10px",
+        borderRadius: 5,
+        border: active ? "2px solid " + staff.color : "1.5px solid #dee2e6",
+        background: active ? staff.color + "15" : "#fff",
+        color: active ? staff.color : "#adb5bd",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, st.label);
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setRooms(STATIONS.map(function (s) {
+        return s.id;
+      }));
+    },
+    style: {
+      padding: "4px 8px",
+      borderRadius: 5,
+      border: "1px solid #dee2e6",
+      background: "#fff",
+      color: "#868e96",
+      fontSize: 10,
+      cursor: "pointer"
+    }
+  }, "Alle"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setRooms([]);
+    },
+    style: {
+      padding: "4px 8px",
+      borderRadius: 5,
+      border: "1px solid #dee2e6",
+      background: "#fff",
+      color: "#868e96",
+      fontSize: 10,
+      cursor: "pointer"
+    }
+  }, "Keine"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#6c757d",
+      fontWeight: 600,
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Verfügbare Tage")), DAYS.map((d, di) => /*#__PURE__*/React.createElement("div", {
     key: di,
     style: {
       display: "flex",
@@ -1588,7 +1781,8 @@ function AvailabilityEditor({
       ...staff,
       availability: av,
       maxHours: maxH,
-      vacDays: vDays
+      vacDays: vDays,
+      rooms: rooms
     }),
     style: {
       padding: "7px 18px",
@@ -1613,6 +1807,235 @@ function AvailabilityEditor({
       cursor: "pointer"
     }
   }, "Abbrechen")));
+}
+function VacationCalendar({
+  staffList,
+  vacations
+}) {
+  const [calYear, setCalYear] = useState(new Date().getFullYear());
+  const months = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+  const today = new Date().toISOString().slice(0, 10);
+  // Days in each month
+  function daysInMonth(m, y) {
+    return new Date(y, m + 1, 0).getDate();
+  }
+  // Total days in year for positioning
+  const totalDays = 365 + (calYear % 4 === 0 ? 1 : 0);
+  function dayOfYear(ds) {
+    const d = new Date(ds + "T00:00:00");
+    const start = new Date(d.getFullYear(), 0, 0);
+    return Math.floor((d - start) / (1000 * 60 * 60 * 24));
+  }
+  // Filter vacations for this year
+  const yearVacs = vacations.filter(function (v) {
+    return v.from.slice(0, 4) === String(calYear) || v.to.slice(0, 4) === String(calYear);
+  });
+  // Month start positions as percentages
+  const monthStarts = [];
+  var cumDays = 0;
+  for (var mi = 0; mi < 12; mi++) {
+    monthStarts.push(cumDays / totalDays * 100);
+    cumDays += daysInMonth(mi, calYear);
+  }
+  const bgMap = {
+    Krank: "#e03131",
+    Urlaub: "#2e7d32",
+    Fortbildung: "#1565c0",
+    Sonstiges: "#757575"
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Jahreskalender"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setCalYear(calYear - 1);
+    },
+    style: {
+      padding: "3px 8px",
+      borderRadius: 4,
+      border: "1px solid #dee2e6",
+      background: "#fff",
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, "<"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 13,
+      fontWeight: 700,
+      minWidth: 40,
+      textAlign: "center"
+    }
+  }, calYear), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setCalYear(calYear + 1);
+    },
+    style: {
+      padding: "3px 8px",
+      borderRadius: 4,
+      border: "1px solid #dee2e6",
+      background: "#fff",
+      cursor: "pointer",
+      fontSize: 12
+    }
+  }, ">"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      fontSize: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 10,
+      height: 10,
+      borderRadius: 2,
+      background: "#2e7d32"
+    }
+  }), " Urlaub"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 10,
+      height: 10,
+      borderRadius: 2,
+      background: "#e03131"
+    }
+  }), " Krank"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 3
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 10,
+      height: 10,
+      borderRadius: 2,
+      background: "#1565c0"
+    }
+  }), " Fortbildung"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "relative",
+      height: 18,
+      marginBottom: 2,
+      marginLeft: 90
+    }
+  }, months.map(function (m, mi) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: mi,
+      style: {
+        position: "absolute",
+        left: monthStarts[mi] + "%",
+        fontSize: 9,
+        fontWeight: 600,
+        color: "#6c757d"
+      }
+    }, m);
+  })), staffList.map(function (s) {
+    var personVacs = yearVacs.filter(function (v) {
+      return v.staffId === s.id;
+    });
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        marginBottom: 2
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        width: 86,
+        fontSize: 10,
+        fontWeight: 600,
+        color: s.color,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+        paddingRight: 4
+      }
+    }, s.name), /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1,
+        position: "relative",
+        height: 16,
+        background: "#f8f9fa",
+        borderRadius: 3,
+        border: "1px solid #e9ecef"
+      }
+    }, monthStarts.map(function (pct, mi) {
+      return mi > 0 ? /*#__PURE__*/React.createElement("div", {
+        key: mi,
+        style: {
+          position: "absolute",
+          left: pct + "%",
+          top: 0,
+          bottom: 0,
+          width: 1,
+          background: "#e9ecef"
+        }
+      }) : null;
+    }), calYear === new Date().getFullYear() && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: "absolute",
+        left: dayOfYear(today) / totalDays * 100 + "%",
+        top: 0,
+        bottom: 0,
+        width: 1.5,
+        background: "#ff6b6b",
+        zIndex: 2
+      }
+    }), personVacs.map(function (v, vi) {
+      var startDay = Math.max(dayOfYear(v.from), 1);
+      var endDay = Math.min(dayOfYear(v.to), totalDays);
+      var left = startDay / totalDays * 100;
+      var width = (endDay - startDay + 1) / totalDays * 100;
+      return /*#__PURE__*/React.createElement("div", {
+        key: vi,
+        title: v.note + ": " + fmtDateDE(v.from) + " - " + fmtDateDE(v.to),
+        style: {
+          position: "absolute",
+          left: left + "%",
+          width: Math.max(width, 0.3) + "%",
+          top: 1,
+          bottom: 1,
+          background: bgMap[v.note] || "#757575",
+          borderRadius: 2,
+          opacity: 0.85,
+          cursor: "default"
+        }
+      });
+    })));
+  }));
 }
 function VacationManager({
   staffList,
@@ -2099,6 +2522,28 @@ function Schichtplaner() {
   // Check for read-only plan link
   const [roData, setRoData] = useState(null);
   const [roTeam, setRoTeam] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [staffList, setStaffList] = useState(DEFAULT_STAFF);
+  const [assignments, setAssignments] = useState({});
+  const [vacations, setVacations] = useState([]);
+  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+  const [activeDay, setActiveDay] = useState(0);
+  const [view, setView] = useState("station");
+  const [selectedStaff, setSelectedStaff] = useState(null);
+  const [editingAv, setEditingAv] = useState(null);
+  const [tab, setTab] = useState("plan");
+  const [showShare, setShowShare] = useState(false);
+  const [shiftModal, setShiftModal] = useState(null);
+  const [smFrom, setSmFrom] = useState("08:00");
+  const [smTo, setSmTo] = useState("14:00");
+  const [showStationCfg, setShowStationCfg] = useState(false);
+  const [stationMins, setStationMins] = useState(function () {
+    var m = {};
+    STATIONS.forEach(function (s) {
+      m[s.id] = s.minStaff || 0;
+    });
+    return m;
+  });
   useEffect(() => {
     const parseHash = h => {
       if (h.startsWith("#plan=")) {
@@ -2127,22 +2572,6 @@ function Schichtplaner() {
   if (roTeam) return /*#__PURE__*/React.createElement(ReadOnlyTeamView, {
     data: roTeam
   });
-  const [loaded, setLoaded] = useState(false);
-  const [staffList, setStaffList] = useState(DEFAULT_STAFF);
-  const [assignments, setAssignments] = useState({});
-  const [vacations, setVacations] = useState([]);
-  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
-  const [activeDay, setActiveDay] = useState(0);
-  const [view, setView] = useState("station");
-  const [selectedStaff, setSelectedStaff] = useState(null);
-  const [editingAv, setEditingAv] = useState(null);
-  const [tab, setTab] = useState("plan");
-  const [showShare, setShowShare] = useState(false);
-
-  // Shift modal
-  const [shiftModal, setShiftModal] = useState(null);
-  const [smFrom, setSmFrom] = useState("08:00");
-  const [smTo, setSmTo] = useState("14:00");
   useEffect(() => {
     (() => {
       const st = loadData("praxis-staff", DEFAULT_STAFF);
@@ -2294,7 +2723,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v0.9"))), /*#__PURE__*/React.createElement("div", {
+  }, "v0.10"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -2442,7 +2871,21 @@ function Schichtplaner() {
       color: "#495057",
       marginLeft: 4
     }
-  }, "→ Woche kopieren"), /*#__PURE__*/React.createElement("div", {
+  }, "Woche kopieren"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowStationCfg(!showStationCfg);
+    },
+    style: {
+      padding: "5px 10px",
+      borderRadius: 5,
+      border: "1px solid #4A90D9",
+      background: showStationCfg ? "#4A90D9" : "#fff",
+      cursor: "pointer",
+      fontSize: 10,
+      fontWeight: 600,
+      color: showStationCfg ? "#fff" : "#4A90D9"
+    }
+  }, "Vorschlag"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -2473,7 +2916,145 @@ function Schichtplaner() {
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "Personal")), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, "Personal")), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 10,
+      padding: "12px 14px",
+      background: "#f0f7ff",
+      borderRadius: 8,
+      border: "1px solid #4A90D955"
+    },
+    className: "no-print"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#4A90D9",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Mindestbesetzung pro Station"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 8,
+      marginBottom: 10
+    }
+  }, STATIONS.map(function (st) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: st.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        color: "#495057",
+        minWidth: 50
+      }
+    }, st.label), /*#__PURE__*/React.createElement("input", {
+      type: "number",
+      min: "0",
+      max: "5",
+      value: stationMins[st.id] || 0,
+      onChange: function (e) {
+        setStationMins(function (prev) {
+          var n = Object.assign({}, prev);
+          n[st.id] = parseInt(e.target.value) || 0;
+          return n;
+        });
+      },
+      style: {
+        width: 42,
+        padding: "3px 6px",
+        border: "1px solid #dee2e6",
+        borderRadius: 4,
+        fontSize: 12,
+        textAlign: "center"
+      }
+    }));
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var cfg = STATIONS.map(function (st) {
+        return {
+          id: st.id,
+          min: stationMins[st.id] || 0
+        };
+      });
+      var proposed = autoSchedule(staffList, vacations, wsStr, cfg);
+      setAssignments(proposed);
+      setShowStationCfg(false);
+    },
+    style: {
+      padding: "7px 18px",
+      borderRadius: 6,
+      border: "none",
+      background: "#4A90D9",
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Neuen Wochenplan generieren"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var cfg = STATIONS.map(function (st) {
+        return {
+          id: st.id,
+          min: stationMins[st.id] || 0
+        };
+      });
+      var proposed = autoSchedule(staffList, vacations, wsStr, cfg);
+      // Merge: keep existing, add proposed where empty
+      setAssignments(function (prev) {
+        var merged = Object.assign({}, prev);
+        Object.keys(proposed).forEach(function (k) {
+          if (!merged[k] || merged[k].length === 0) merged[k] = proposed[k];
+        });
+        return merged;
+      });
+      setShowStationCfg(false);
+    },
+    style: {
+      padding: "7px 18px",
+      borderRadius: 6,
+      border: "1px solid #4A90D9",
+      background: "#fff",
+      color: "#4A90D9",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Lücken auffüllen"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowStationCfg(false);
+    },
+    style: {
+      padding: "7px 18px",
+      borderRadius: 6,
+      border: "1px solid #dee2e6",
+      background: "#fff",
+      color: "#868e96",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Abbrechen")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 6,
+      fontSize: 10,
+      color: "#868e96"
+    }
+  }, "Der Algorithmus verteilt Schichten fair nach Verfügbarkeit, Raumzulassung und max. Wochenstunden.")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 1,
@@ -2683,12 +3264,15 @@ function Schichtplaner() {
       color: "#868e96",
       fontSize: 12
     }
-  }, "Person auswählen"))), tab === "vacation" && /*#__PURE__*/React.createElement(VacationManager, {
+  }, "Person auswählen"))), tab === "vacation" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(VacationCalendar, {
+    staffList: staffList,
+    vacations: vacations
+  }), /*#__PURE__*/React.createElement(VacationManager, {
     staffList: staffList,
     vacations: vacations,
     onAdd: v => setVacations(prev => [...prev, v]),
     onRemove: id => setVacations(prev => prev.filter(x => x.id !== id))
-  }), tab === "team" && /*#__PURE__*/React.createElement("div", null, editingAv ? /*#__PURE__*/React.createElement(AvailabilityEditor, {
+  })), tab === "team" && /*#__PURE__*/React.createElement("div", null, editingAv ? /*#__PURE__*/React.createElement(AvailabilityEditor, {
     staff: editingAv,
     onCancel: () => setEditingAv(null),
     onSave: u => {
@@ -2909,7 +3493,18 @@ function Schichtplaner() {
         fontSize: 10,
         color: "#868e96"
       }
-    }, "max. ", s.maxHours, "h · ", (_s$vacDays3 = s.vacDays) !== null && _s$vacDays3 !== void 0 ? _s$vacDays3 : 26, " Urlaubstage · ", getWeeklyHours(assignments, s.id), "h geplant"))), /*#__PURE__*/React.createElement("div", {
+    }, "max. ", s.maxHours, "h · ", (_s$vacDays3 = s.vacDays) !== null && _s$vacDays3 !== void 0 ? _s$vacDays3 : 26, " Urlaubstage · ", getWeeklyHours(assignments, s.id), "h geplant"), s.rooms && s.rooms.length > 0 && s.rooms.length < STATIONS.length && /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: "#adb5bd",
+        marginTop: 2
+      }
+    }, s.rooms.map(function (rid) {
+      var st = STATIONS.find(function (x) {
+        return x.id === rid;
+      });
+      return st ? st.label : rid;
+    }).join(", ")))), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 3,
@@ -3151,6 +3746,8 @@ function Schichtplaner() {
     }
   }, staffList.map(s => {
     const avail = isAvailable(s, shiftModal.day, "08:00", vacations, wsStr);
+    const roomOk = !s.rooms || s.rooms.length === 0 || s.rooms.includes(shiftModal.station);
+    const canWork = avail && roomOk;
     const alreadyHere = Object.entries(assignments).some(([k, sids]) => {
       const p = k.split("-");
       return parseInt(p[0]) === shiftModal.day && p[1] === shiftModal.station && (sids === null || sids === void 0 ? void 0 : sids.includes(s.id));
@@ -3160,9 +3757,9 @@ function Schichtplaner() {
     const ds = dt.toISOString().slice(0, 10);
     const absence = vacations.find(v => v.staffId === s.id && ds >= v.from && ds <= v.to);
     const abIcons = {
-      Krank: "🤒",
-      Urlaub: "🏖️",
-      Fortbildung: "📚"
+      Krank: "\u{1F912}",
+      Urlaub: "\u{1F3D6}",
+      Fortbildung: "\u{1F4DA}"
     };
     return /*#__PURE__*/React.createElement("button", {
       key: s.id,
@@ -3173,31 +3770,35 @@ function Schichtplaner() {
         gap: 4,
         padding: "6px 12px",
         borderRadius: 6,
-        border: `1.5px solid ${avail ? s.color + "55" : "#e9ecef"}`,
+        border: `1.5px solid ${canWork ? s.color + "55" : "#e9ecef"}`,
         background: alreadyHere ? s.color + "10" : "#fff",
-        color: avail ? s.color : "#ccc",
+        color: canWork ? s.color : "#ccc",
         fontSize: 12,
         fontWeight: 600,
-        cursor: avail ? "pointer" : "default",
-        opacity: avail ? 1 : 0.4
+        cursor: canWork ? "pointer" : "default",
+        opacity: canWork ? 1 : 0.35
       },
-      disabled: !avail
+      disabled: !canWork
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         width: 7,
         height: 7,
         borderRadius: "50%",
-        background: avail ? s.color : "#ccc"
+        background: canWork ? s.color : "#ccc"
       }
     }), s.name, absence && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9
       }
-    }, abIcons[absence.note] || "⛔"), !avail && !absence && /*#__PURE__*/React.createElement("span", {
+    }, abIcons[absence.note] || "\u26D4"), !avail && !absence && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9
       }
-    }, "⛔"));
+    }, "\u26D4"), avail && !roomOk && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9
+      }
+    }, "\u{1F6AB}"));
   }))))), showShare && /*#__PURE__*/React.createElement(ShareModal, {
     staffList: staffList,
     assignments: assignments,
