@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Schichtplaner — Zahnarztpraxis</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #fff; }
+  button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #4A90D9; outline-offset: 1px; }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useCallback, useEffect, useRef } = React;
+
+
+
+const DAYS = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"];
+const DAY_SHORT = ["Mo", "Di", "Mi", "Do", "Fr"];
+
+const STATIONS = [
+  { id: "empfang", label: "Empfang", slots: 2 },
+  { id: "buero", label: "Büro", slots: 2 },
+  { id: "zi1", label: "Zi 1", slots: 2 },
+  { id: "zi2", label: "Zi 2", slots: 1 },
+  { id: "zi3", label: "Zi 3", slots: 2 },
+  { id: "zi4", label: "Zi 4", slots: 1 },
+  { id: "zi5", label: "Zi 5", slots: 1 },
+  { id: "zi6", label: "Zi 6", slots: 1 },
+  { id: "steri", label: "Steri", slots: 1 },
+];
+
+function generateSlots() {
+  const slots = [];
+  for (let h = 7; h < 20; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      if (h === 7 && m === 0) continue;
+      const start = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      slots.push({ start, label: start });
+    }
+  }
+  return slots;
+}
+const TIME_SLOTS = generateSlots();
+
+const DEFAULT_STAFF = [
+  { id: "martina", name: "Martina", color: "#4A90D9", availability: { 0: { from: "07:30", to: "14:30" }, 1: { from: "07:30", to: "20:00" }, 2: { from: "09:00", to: "14:00" }, 3: { from: "08:30", to: "15:00" }, 4: { from: "10:30", to: "18:00" } }, maxHours: 40, vacDays: 30 },
+  { id: "juliane", name: "Juliane", color: "#D94A7A", availability: { 0: { from: "08:00", to: "15:00" }, 1: { from: "13:30", to: "20:00" }, 2: { from: "08:00", to: "15:00" }, 3: { from: "08:00", to: "15:00" }, 4: { from: "10:30", to: "18:00" } }, maxHours: 38, vacDays: 30 },
+  { id: "susi", name: "Susi", color: "#50B87A", availability: { 0: { from: "07:30", to: "14:00" }, 1: { from: "14:00", to: "20:00" }, 2: { from: "07:30", to: "14:00" }, 3: { from: "07:30", to: "14:00" }, 4: { from: "07:30", to: "12:00" } }, maxHours: 30, vacDays: 28 },
+  { id: "tatjana", name: "Tatjana", color: "#E8A838", availability: { 0: { from: "07:30", to: "14:00" }, 1: { from: "14:00", to: "20:00" }, 2: { from: "07:30", to: "15:00" }, 3: { from: "13:30", to: "20:00" }, 4: { from: "07:30", to: "14:00" } }, maxHours: 35, vacDays: 30 },
+  { id: "mia", name: "Mia", color: "#9B59B6", availability: { 0: { from: "07:30", to: "11:00" }, 1: { from: "07:30", to: "14:00" }, 4: { from: "11:00", to: "14:00" } }, maxHours: 20, vacDays: 24 },
+  { id: "tanja", name: "Tanja", color: "#E67E22", availability: { 0: { from: "07:30", to: "20:00" }, 1: { from: "07:30", to: "13:00" }, 3: { from: "15:00", to: "20:00" } }, maxHours: 30, vacDays: 28 },
+  { id: "karina", name: "Karina", color: "#1ABC9C", availability: { 0: { from: "12:30", to: "20:00" }, 1: { from: "07:30", to: "14:00" }, 3: { from: "07:30", to: "15:00" }, 4: { from: "07:30", to: "14:00" } }, maxHours: 32, vacDays: 28 },
+  { id: "remzie", name: "Remzie", color: "#C0392B", availability: { 0: { from: "12:30", to: "20:00" }, 1: { from: "07:30", to: "14:00" }, 2: { from: "07:30", to: "15:00" } }, maxHours: 25, vacDays: 26 },
+  { id: "annette", name: "Annette", color: "#2980B9", availability: { 0: { from: "13:30", to: "20:00" }, 1: { from: "08:00", to: "14:00" }, 2: { from: "08:00", to: "15:00" }, 3: { from: "15:00", to: "20:00" }, 4: { from: "08:00", to: "14:00" } }, maxHours: 30, vacDays: 28 },
+  { id: "christine", name: "Christine", color: "#8E44AD", availability: { 0: { from: "13:30", to: "20:00" }, 1: { from: "08:00", to: "14:00" }, 3: { from: "15:00", to: "20:00" }, 4: { from: "08:00", to: "14:00" } }, maxHours: 28, vacDays: 26 },
+  { id: "aischat", name: "Aischat", color: "#27AE60", availability: { 0: { from: "12:30", to: "20:00" }, 1: { from: "08:00", to: "14:00" }, 3: { from: "07:30", to: "15:00" }, 4: { from: "07:30", to: "14:00" } }, maxHours: 30, vacDays: 26 },
+  { id: "dorentina", name: "Dorentina", color: "#D35400", availability: { 1: { from: "09:00", to: "14:00" }, 2: { from: "09:00", to: "11:00" }, 3: { from: "09:00", to: "14:00" }, 4: { from: "17:30", to: "18:00" } }, maxHours: 20, vacDays: 24 },
+  { id: "vanessa", name: "Vanessa", color: "#16A085", availability: { 0: { from: "09:00", to: "20:00" }, 1: { from: "14:00", to: "20:00" }, 2: { from: "07:30", to: "15:00" }, 3: { from: "15:00", to: "20:00" }, 4: { from: "09:00", to: "14:00" } }, maxHours: 32, vacDays: 28 },
+  { id: "nina", name: "Nina", color: "#7F8C8D", availability: { 0: { from: "15:00", to: "20:00" }, 1: { from: "07:30", to: "14:00" }, 2: { from: "07:30", to: "15:00" }, 3: { from: "07:30", to: "20:00" }, 4: { from: "10:00", to: "18:00" } }, maxHours: 35, vacDays: 30 },
+  { id: "elnaz", name: "Elnaz", color: "#E74C3C", availability: { 2: { from: "07:30", to: "15:00" }, 4: { from: "08:00", to: "14:00" } }, maxHours: 16, vacDays: 20 },
+  { id: "beatrice", name: "Beatrice", color: "#3498DB", availability: { 0: { from: "15:00", to: "18:00" }, 3: { from: "15:00", to: "18:00" }, 4: { from: "14:00", to: "18:00" } }, maxHours: 12, vacDays: 20 },
+  { id: "pam", name: "Pam", color: "#F39C12", availability: { 3: { from: "08:00", to: "15:00" } }, maxHours: 8, vacDays: 20 },
+  { id: "nicol", name: "Nicol", color: "#A569BD", availability: { 3: { from: "15:00", to: "20:00" } }, maxHours: 6, vacDays: 20 },
+  { id: "inga", name: "Inga", color: "#45B39D", availability: { 1: { from: "12:30", to: "20:00" }, 2: { from: "07:30", to: "14:00" }, 3: { from: "15:00", to: "20:00" } }, maxHours: 22, vacDays: 24 },
+  { id: "jana", name: "Jana", color: "#EC7063", availability: { 0: { from: "09:00", to: "14:30" }, 1: { from: "09:00", to: "14:00" }, 3: { from: "15:00", to: "20:00" }, 4: { from: "08:00", to: "14:00" } }, maxHours: 25, vacDays: 26 },
+];
+
+function buildDefaultAssignments() {
+  const a = {};
+  const set = (day, station, slotIdx, startTime, endTime, staffIds) => {
+    TIME_SLOTS.filter(s => s.start >= startTime && s.start < endTime).forEach(slot => {
+      a[`${day}-${station}-${slotIdx}-${slot.start}`] = staffIds;
+    });
+  };
+  set(0,"empfang",0,"09:00","14:30",["jana"]);set(0,"empfang",0,"14:30","20:00",["tanja"]);set(0,"empfang",1,"07:30","11:00",["martina"]);set(0,"buero",0,"12:30","15:00",["karina"]);set(0,"buero",1,"12:30","15:00",["martina"]);set(0,"zi1",0,"08:00","15:00",["juliane"]);set(0,"zi1",1,"07:30","15:00",["susi"]);set(0,"zi2",0,"13:30","20:00",["annette"]);set(0,"zi3",0,"12:30","20:00",["remzie"]);set(0,"zi3",1,"13:30","20:00",["christine"]);set(0,"zi3",1,"09:00","12:30",["aischat"]);set(0,"zi5",0,"07:30","14:00",["tatjana"]);set(0,"zi6",0,"09:00","13:00",["vanessa"]);set(0,"zi6",0,"15:00","20:00",["vanessa"]);set(0,"steri",0,"07:30","11:00",["mia"]);set(0,"steri",0,"15:00","20:00",["beatrice"]);
+  set(1,"empfang",0,"07:30","13:00",["tanja"]);set(1,"empfang",1,"07:30","13:00",["karina"]);set(1,"buero",0,"12:30","14:00",["karina"]);set(1,"buero",0,"14:00","20:00",["inga"]);set(1,"zi1",1,"08:00","14:00",["aischat"]);set(1,"zi2",0,"08:00","14:00",["christine"]);set(1,"zi3",0,"07:30","14:00",["remzie"]);set(1,"zi3",0,"14:00","20:00",["mia"]);set(1,"zi3",1,"08:00","14:00",["annette"]);set(1,"zi4",0,"09:00","14:00",["jana"]);set(1,"zi4",0,"14:00","20:00",["nina"]);set(1,"zi5",0,"09:00","14:00",["dorentina"]);set(1,"zi5",0,"14:00","20:00",["tatjana"]);set(1,"zi6",0,"14:00","20:00",["vanessa"]);set(1,"steri",0,"07:30","14:00",["nina"]);set(1,"steri",0,"14:00","20:00",["martina"]);set(1,"zi1",0,"13:30","20:00",["juliane"]);set(1,"buero",1,"14:00","20:00",["susi"]);
+  set(2,"empfang",0,"07:30","14:00",["inga"]);set(2,"empfang",1,"09:00","14:00",["martina"]);set(2,"zi1",0,"08:00","15:00",["juliane"]);set(2,"zi1",1,"07:30","15:00",["susi"]);set(2,"zi3",0,"08:00","15:00",["annette"]);set(2,"zi3",1,"07:30","15:00",["remzie"]);set(2,"zi4",0,"09:00","11:00",["dorentina"]);set(2,"zi5",0,"07:30","15:00",["tatjana"]);set(2,"zi6",0,"07:30","15:00",["vanessa"]);set(2,"steri",0,"07:30","15:00",["nina"]);
+  set(3,"empfang",0,"08:30","15:00",["martina"]);set(3,"empfang",1,"07:30","15:00",["karina"]);set(3,"buero",0,"12:30","15:00",["karina"]);set(3,"buero",0,"15:00","20:00",["inga"]);set(3,"zi1",0,"08:00","15:00",["juliane"]);set(3,"zi1",1,"07:30","15:00",["susi"]);set(3,"zi2",0,"08:00","15:00",["pam"]);set(3,"zi2",0,"15:00","20:00",["christine"]);set(3,"zi3",0,"07:30","20:00",["nina"]);set(3,"zi3",1,"15:00","20:00",["vanessa"]);set(3,"zi4",0,"15:00","20:00",["annette"]);set(3,"zi5",0,"09:00","14:00",["dorentina"]);set(3,"zi5",0,"14:00","20:00",["tatjana"]);set(3,"zi6",0,"15:00","20:00",["nicol"]);set(3,"steri",0,"07:30","15:00",["aischat"]);set(3,"steri",0,"15:00","20:00",["beatrice"]);set(3,"zi4",0,"09:00","13:00",["jana"]);set(3,"empfang",0,"15:00","20:00",["inga"]);set(3,"empfang",1,"15:00","20:00",["tanja"]);
+  set(4,"empfang",0,"07:30","13:00",["karina"]);set(4,"empfang",1,"07:30","12:00",["susi"]);set(4,"empfang",1,"10:30","18:00",["martina"]);set(4,"buero",0,"12:30","14:00",["karina"]);set(4,"zi1",0,"10:30","18:00",["juliane"]);set(4,"zi1",1,"10:00","18:00",["nina"]);set(4,"zi2",0,"08:00","14:00",["christine"]);set(4,"zi3",0,"08:00","14:00",["annette"]);set(4,"zi3",1,"08:00","14:00",["jana"]);set(4,"zi5",0,"07:30","14:00",["tatjana"]);set(4,"zi6",0,"09:00","14:00",["vanessa"]);set(4,"steri",0,"07:30","14:00",["aischat"]);set(4,"steri",0,"14:00","18:00",["beatrice"]);
+  return a;
+}
+
+function loadData(key, fallback) {
+  try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : fallback; } catch { return fallback; }
+}
+function saveData(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) { console.error(e); }
+} catch(e) { console.error(e); }
+}
+
+function timeToMin(t) { const [h,m]=t.split(":").map(Number); return h*60+m; }
+
+function isAvailable(staff, dayIdx, time, vacations, weekStartStr) {
+  const av = staff.availability?.[dayIdx];
+  if (!av) return false;
+  const t = timeToMin(time);
+  if (t < timeToMin(av.from) || t >= timeToMin(av.to)) return false;
+  if (weekStartStr && vacations) {
+    const d = new Date(weekStartStr + "T00:00:00");
+    d.setDate(d.getDate() + dayIdx);
+    const ds = d.toISOString().slice(0,10);
+    for (const v of vacations) { if (v.staffId === staff.id && ds >= v.from && ds <= v.to) return false; }
+  }
+  return true;
+}
+
+function findConflicts(assignments) {
+  const ps = {};
+  Object.entries(assignments).forEach(([key, sids]) => {
+    if (!sids?.length) return;
+    const [day,,,time] = key.split("-");
+    sids.forEach(sid => { const pk=`${sid}-${day}-${time}`; if(!ps[pk])ps[pk]=[]; ps[pk].push(key); });
+  });
+  const c = new Set();
+  Object.values(ps).forEach(keys => { if(keys.length>1) keys.forEach(k=>c.add(k)); });
+  return c;
+}
+
+function findViolations(assignments, staffList, vacations, weekStartStr) {
+  const v = new Set();
+  const sm = {}; staffList.forEach(s => sm[s.id]=s);
+  Object.entries(assignments).forEach(([key, sids]) => {
+    if (!sids?.length) return;
+    const p=key.split("-"); const day=parseInt(p[0]),time=p[3];
+    sids.forEach(sid => { const s=sm[sid]; if(s && !isAvailable(s,day,time,vacations,weekStartStr)) v.add(key); });
+  });
+  return v;
+}
+
+function getWeeklyHours(assignments, staffId) {
+  let c=0; Object.values(assignments).forEach(sids=>{if(sids?.includes(staffId))c++;}); return (c*0.5).toFixed(1);
+}
+
+function getPersonWeek(assignments, staffId) {
+  const week={}; DAYS.forEach((_,i)=>week[i]=[]);
+  Object.entries(assignments).forEach(([key,sids])=>{
+    if(!sids?.includes(staffId))return;
+    const p=key.split("-");
+    week[parseInt(p[0])].push({station:p[1],slotIdx:p[2],time:p[3]});
+  });
+  Object.keys(week).forEach(d=>week[d].sort((a,b)=>a.time.localeCompare(b.time)));
+  return week;
+}
+
+function addEndTime(t) {
+  const [h,m]=t.split(":").map(Number); const nm=m+30;
+  return nm>=60?`${String(h+1).padStart(2,"0")}:00`:`${String(h).padStart(2,"0")}:${String(nm).padStart(2,"0")}`;
+}
+
+function getMonday(d) { const dt=new Date(d); const day=dt.getDay(); const diff=dt.getDate()-day+(day===0?-6:1); dt.setDate(diff); dt.setHours(0,0,0,0); return dt; }
+function fmtDate(d) { return d.toISOString().slice(0,10); }
+function fmtDateDE(s) { const [y,m,d]=s.split("-"); return `${d}.${m}.${y}`; }
+function weekKey(d) { return `wk-${fmtDate(getMonday(d))}`; }
+
+function Chip({ staffId, small, onRemove, staffList }) {
+  const s = staffList.find(x=>x.id===staffId);
+  if (!s) return null;
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:2, background:s.color+"20", color:s.color, border:`1.5px solid ${s.color}44`, borderRadius:5, padding:small?"1px 4px":"2px 6px", fontSize:small?9.5:11, fontWeight:600, whiteSpace:"nowrap", lineHeight:1.4 }}>
+      {s.name}
+      {onRemove && <button onClick={e=>{e.stopPropagation();onRemove(staffId);}} style={{ background:"none",border:"none",color:s.color,cursor:"pointer",padding:0,fontSize:11,lineHeight:1,fontWeight:700,marginLeft:1 }}>×</button>}
+    </span>
+  );
+}
+
+function StationGrid({ day, assignments, conflicts, violations, onCellClick, selectedStaff, staffList }) {
+  return (
+    <div style={{ overflowX:"auto", borderRadius:8, border:"1px solid #e9ecef" }}>
+      <table style={{ borderCollapse:"collapse", width:"100%", fontSize:11, tableLayout:"fixed" }}>
+        <thead>
+          <tr>
+            <th style={{ width:52, position:"sticky", left:0, background:"#f5f6f7", zIndex:2, borderBottom:"2px solid #dee2e6", padding:"6px 4px", fontSize:9.5, color:"#6c757d", textAlign:"left", fontWeight:700 }}>Zeit</th>
+            {STATIONS.map(st => <th key={st.id} colSpan={st.slots} style={{ borderBottom:"2px solid #dee2e6", borderLeft:"1px solid #e0e2e5", padding:"6px 3px", fontSize:9.5, fontWeight:700, color:"#495057", textAlign:"center", background:"#f5f6f7" }}>{st.label}</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {TIME_SLOTS.map((slot,si)=>(
+            <tr key={slot.start}>
+              <td style={{ position:"sticky", left:0, background:si%2===0?"#fff":"#fafbfc", zIndex:1, padding:"2px 4px", fontSize:9, color:"#868e96", fontVariantNumeric:"tabular-nums", borderRight:"1px solid #e9ecef", borderBottom:"1px solid #f1f3f5", whiteSpace:"nowrap" }}>{slot.label}</td>
+              {STATIONS.flatMap(st=>Array.from({length:st.slots},(_,idx)=>{
+                const key=`${day}-${st.id}-${idx}-${slot.start}`;
+                const assigned=assignments[key]||[];
+                const isCon=conflicts.has(key), isVio=violations.has(key);
+                const selColor = selectedStaff ? staffList.find(x=>x.id===selectedStaff)?.color : null;
+                return (
+                  <td key={`${st.id}-${idx}`} onClick={()=>onCellClick(key)} style={{ borderLeft:idx===0?"1px solid #e0e2e5":"1px solid #f1f3f5", borderBottom:"1px solid #f1f3f5", padding:"1px 2px", minWidth:56, height:21, cursor:"pointer", background:isCon?"#fff0f0":isVio?"#fff8e1":selectedStaff&&assigned.includes(selectedStaff)?selColor+"15":"transparent" }}>
+                    <div style={{ display:"flex", gap:1, flexWrap:"wrap" }}>
+                      {assigned.map(sid=><Chip key={sid} staffId={sid} small staffList={staffList} />)}
+                    </div>
+                  </td>
+                );
+              }))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PersonView({ staffId, assignments, staffList }) {
+  const week=getPersonWeek(assignments,staffId);
+  const s=staffList.find(x=>x.id===staffId);
+  if(!s) return null;
+  const stLabels={}; STATIONS.forEach(x=>stLabels[x.id]=x.label);
+  return (
+    <div style={{ padding:"8px 0" }}>
+      <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:14, paddingBottom:10, borderBottom:`2px solid ${s.color}33` }}>
+        <div style={{ width:34, height:34, borderRadius:8, background:s.color+"20", display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:700, color:s.color }}>{s.name[0]}</div>
+        <div>
+          <div style={{ fontWeight:700, fontSize:15, color:"#212529" }}>{s.name}</div>
+          <div style={{ fontSize:11, color:"#868e96" }}>{getWeeklyHours(assignments,staffId)} Std. / Woche · max. {s.maxHours}h</div>
+        </div>
+      </div>
+      <div style={{ marginBottom:12 }}>
+        <div style={{ fontSize:10, fontWeight:700, color:"#868e96", marginBottom:4, textTransform:"uppercase", letterSpacing:0.6 }}>Verfügbarkeit</div>
+        <div style={{ display:"flex", gap:4, flexWrap:"wrap" }}>
+          {DAYS.map((dn,di)=>{ const av=s.availability?.[di]; return (
+            <span key={di} style={{ fontSize:10, padding:"3px 8px", borderRadius:5, background:av?s.color+"12":"#f1f3f5", color:av?s.color:"#ccc", border:`1px solid ${av?s.color+"33":"#e9ecef"}`, fontWeight:600 }}>{DAY_SHORT[di]} {av?`${av.from}–${av.to}`:"—"}</span>
+          ); })}
+        </div>
+      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(5, 1fr)", gap:6 }}>
+        {DAYS.map((_,di)=>{
+          const daySlots=week[di]||[]; const groups=[]; let cur=null;
+          daySlots.forEach(slot=>{ if(cur&&cur.station===slot.station&&cur.slotIdx===slot.slotIdx){cur.end=slot.time;}else{if(cur)groups.push(cur);cur={station:slot.station,slotIdx:slot.slotIdx,start:slot.time,end:slot.time};}}); if(cur)groups.push(cur);
+          groups.forEach(g=>g.endDisplay=addEndTime(g.end));
+          return (
+            <div key={di} style={{ background:"#f8f9fa", borderRadius:8, padding:8, minHeight:50 }}>
+              <div style={{ fontSize:9.5, fontWeight:700, color:"#868e96", textTransform:"uppercase", letterSpacing:0.7, marginBottom:5 }}>{DAY_SHORT[di]}</div>
+              {groups.length===0&&<div style={{ fontSize:10, color:"#ced4da", fontStyle:"italic" }}>Frei</div>}
+              {groups.map((g,gi)=>(
+                <div key={gi} style={{ background:s.color+"12", border:`1px solid ${s.color}28`, borderRadius:5, padding:"3px 6px", marginBottom:3, fontSize:10 }}>
+                  <div style={{ fontWeight:600, color:s.color }}>{stLabels[g.station]||g.station}</div>
+                  <div style={{ color:"#6c757d", fontVariantNumeric:"tabular-nums" }}>{g.start}–{g.endDisplay}</div>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AvailabilityEditor({ staff, onSave, onCancel }) {
+  const [av,setAv]=useState(JSON.parse(JSON.stringify(staff.availability||{})));
+  const [maxH,setMaxH]=useState(staff.maxHours||40);
+  const [vDays,setVDays]=useState(staff.vacDays??26);
+  const toggle=di=>{const n={...av};if(n[di])delete n[di];else n[di]={from:"08:00",to:"17:00"};setAv(n);};
+  const setTime=(di,f,val)=>{const n={...av};n[di]={...n[di],[f]:val};setAv(n);};
+  return (
+    <div style={{ padding:16, background:"#fff", borderRadius:10, border:"1px solid #e9ecef" }}>
+      <div style={{ fontSize:14, fontWeight:700, marginBottom:12, display:"flex", alignItems:"center", gap:8 }}>
+        <span style={{ width:24, height:24, borderRadius:6, background:staff.color+"20", display:"inline-flex", alignItems:"center", justifyContent:"center", fontSize:12, fontWeight:700, color:staff.color }}>{staff.name[0]}</span>
+        {staff.name}
+      </div>
+      <div style={{ display:"flex", gap:16, marginBottom:14 }}>
+        <div>
+          <label style={{ fontSize:11, color:"#6c757d", fontWeight:600 }}>Max. Wochenstunden</label>
+          <input type="number" value={maxH} onChange={e=>setMaxH(Number(e.target.value))} style={{ display:"block", width:80, padding:"5px 8px", border:"1px solid #dee2e6", borderRadius:5, fontSize:13, marginTop:3 }} />
+        </div>
+        <div>
+          <label style={{ fontSize:11, color:"#6c757d", fontWeight:600 }}>Urlaubstage / Jahr</label>
+          <input type="number" value={vDays} onChange={e=>setVDays(Number(e.target.value))} style={{ display:"block", width:80, padding:"5px 8px", border:"1px solid #dee2e6", borderRadius:5, fontSize:13, marginTop:3 }} />
+        </div>
+      </div>
+      {DAYS.map((d,di)=>(
+        <div key={di} style={{ display:"flex", alignItems:"center", gap:8, marginBottom:7 }}>
+          <label style={{ display:"flex", alignItems:"center", gap:5, width:100, fontSize:12, fontWeight:500, cursor:"pointer" }}>
+            <input type="checkbox" checked={!!av[di]} onChange={()=>toggle(di)} style={{ accentColor:staff.color }} /> {d}
+          </label>
+          {av[di]&&<>
+            <input type="time" value={av[di].from} onChange={e=>setTime(di,"from",e.target.value)} style={{ padding:"3px 6px", border:"1px solid #dee2e6", borderRadius:5, fontSize:12 }} />
+            <span style={{ color:"#868e96", fontSize:11 }}>–</span>
+            <input type="time" value={av[di].to} onChange={e=>setTime(di,"to",e.target.value)} style={{ padding:"3px 6px", border:"1px solid #dee2e6", borderRadius:5, fontSize:12 }} />
+          </>}
+        </div>
+      ))}
+      <div style={{ display:"flex", gap:8, marginTop:16 }}>
+        <button onClick={()=>onSave({...staff,availability:av,maxHours:maxH,vacDays:vDays})} style={{ padding:"7px 18px", borderRadius:6, border:"none", background:"#212529", color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer" }}>Speichern</button>
+        <button onClick={onCancel} style={{ padding:"7px 18px", borderRadius:6, border:"1px solid #dee2e6", background:"#fff", color:"#495057", fontSize:12, fontWeight:600, cursor:"pointer" }}>Abbrechen</button>
+      </div>
+    </div>
+  );
+}
+
+function VacationManager({ staffList, vacations, onAdd, onRemove }) {
+  const [staffId,setStaffId]=useState(staffList[0]?.id||"");
+  const [from,setFrom]=useState(""); const [to,setTo]=useState("");
+  const [note,setNote]=useState("Urlaub");
+  const sorted=[...vacations].sort((a,b)=>a.from.localeCompare(b.from));
+  const today=new Date().toISOString().slice(0,10);
+
+  const vacDays = {};
+  staffList.forEach(s => { vacDays[s.id] = { total: s.vacDays ?? 26, used: 0 }; });
+  vacations.filter(v => v.note === "Urlaub").forEach(v => {
+    const d1 = new Date(v.from + "T00:00:00"), d2 = new Date(v.to + "T00:00:00");
+    let days = 0;
+    for (let d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
+      const wd = d.getDay();
+      if (wd > 0 && wd < 6) days++;
+    }
+    if (vacDays[v.staffId]) vacDays[v.staffId].used += days;
+  });
+
+  return (
+    <div>
+      <div style={{ padding:14, background:"#f8f9fa", borderRadius:8, marginBottom:14 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:"#6c757d", marginBottom:8, textTransform:"uppercase", letterSpacing:0.5 }}>Neue Abwesenheit eintragen</div>
+        <div style={{ display:"flex", gap:8, flexWrap:"wrap", alignItems:"flex-end" }}>
+          <div>
+            <label style={{ fontSize:10, fontWeight:600, color:"#868e96", display:"block", marginBottom:2 }}>Person</label>
+            <select value={staffId} onChange={e=>setStaffId(e.target.value)} style={{ padding:"5px 8px", border:"1px solid #dee2e6", borderRadius:5, fontSize:12 }}>
+              {staffList.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{ fontSize:10, fontWeight:600, color:"#868e96", display:"block", marginBottom:2 }}>Von</label>
+            <input type="date" value={from} onChange={e=>setFrom(e.target.value)} style={{ padding:"4px 8px", border:"1px solid #dee2e6", borderRadius:5, fontSize:12 }} />
+          </div>
+          <div>
+            <label style={{ fontSize:10, fontWeight:600, color:"#868e96", display:"block", marginBottom:2 }}>Bis</label>
+            <input type="date" value={to} onChange={e=>setTo(e.target.value)} style={{ padding:"4px 8px", border:"1px solid #dee2e6", borderRadius:5, fontSize:12 }} />
+          </div>
+          <div>
+            <label style={{ fontSize:10, fontWeight:600, color:"#868e96", display:"block", marginBottom:2 }}>Grund</label>
+            <select value={note} onChange={e=>setNote(e.target.value)} style={{ padding:"5px 8px", border:"1px solid #dee2e6", borderRadius:5, fontSize:12 }}>
+              <option value="Urlaub">Urlaub</option>
+              <option value="Krank">Krank</option>
+              <option value="Fortbildung">Fortbildung</option>
+              <option value="Sonstiges">Sonstiges</option>
+            </select>
+          </div>
+          <button onClick={()=>{if(staffId&&from&&to){onAdd({id:Date.now().toString(),staffId,from,to,note});setFrom("");setTo("");}}} style={{ padding:"6px 16px", borderRadius:6, border:"none", background:"#212529", color:"#fff", fontSize:12, fontWeight:600, cursor:"pointer", height:30 }}>+ Eintragen</button>
+        </div>
+      </div>
+
+      {/* Vacation balance overview */}
+      <div style={{ marginBottom:16 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:"#6c757d", marginBottom:6, textTransform:"uppercase", letterSpacing:0.5 }}>Urlaubsübersicht</div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:4 }}>
+          {staffList.map(s => {
+            const vd = vacDays[s.id] || { total: s.vacDays ?? 26, used: 0 };
+            const remaining = vd.total - vd.used;
+            const pct = vd.total > 0 ? (vd.used / vd.total) * 100 : 0;
+            return (
+              <div key={s.id} style={{ padding:"5px 9px", borderRadius:6, border:`1px solid ${s.color}33`, background:s.color+"08", fontSize:10, display:"flex", alignItems:"center", gap:6, minWidth:140 }}>
+                <span style={{ width:6, height:6, borderRadius:"50%", background:s.color, flexShrink:0 }} />
+                <span style={{ fontWeight:600, color:s.color, minWidth:60 }}>{s.name}</span>
+                <div style={{ flex:1, display:"flex", flexDirection:"column", gap:2 }}>
+                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"baseline" }}>
+                    <span style={{ color:remaining<5?"#e03131":"#6c757d", fontWeight:remaining<5?700:400 }}>{remaining} von {vd.total}</span>
+                  </div>
+                  <div style={{ height:3, borderRadius:2, background:"#e9ecef", overflow:"hidden" }}>
+                    <div style={{ height:"100%", borderRadius:2, background:remaining<5?"#e03131":s.color, width:`${Math.min(pct,100)}%`, transition:"width 0.3s" }} />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {sorted.length===0&&<div style={{ textAlign:"center", padding:30, color:"#ced4da", fontSize:12 }}>Keine Einträge vorhanden</div>}
+      <div style={{ display:"flex", flexDirection:"column", gap:4 }}>
+        {sorted.map(v=>{
+          const s=staffList.find(x=>x.id===v.staffId);
+          const isPast=v.to<today;
+          const bgMap = { Krank:"#fff0f0", Urlaub:"#e8f5e9", Fortbildung:"#e3f2fd", Sonstiges:"#f5f5f5" };
+          const colMap = { Krank:"#e03131", Urlaub:"#2e7d32", Fortbildung:"#1565c0", Sonstiges:"#757575" };
+          return (
+            <div key={v.id} style={{ display:"flex", alignItems:"center", gap:8, padding:"6px 10px", borderRadius:6, background:isPast?"#fafafa":"#fff", border:"1px solid #e9ecef", opacity:isPast?0.45:1 }}>
+              <span style={{ width:8, height:8, borderRadius:"50%", background:s?.color||"#ccc", flexShrink:0 }} />
+              <span style={{ fontSize:12, fontWeight:600, color:s?.color||"#495057", minWidth:80 }}>{s?.name||v.staffId}</span>
+              <span style={{ fontSize:11, color:"#495057", fontVariantNumeric:"tabular-nums" }}>{fmtDateDE(v.from)} – {fmtDateDE(v.to)}</span>
+              <span style={{ fontSize:10, padding:"1px 7px", borderRadius:4, background:bgMap[v.note]||"#f5f5f5", color:colMap[v.note]||"#757575", fontWeight:600 }}>{v.note}</span>
+              <div style={{ flex:1 }} />
+              <button onClick={()=>onRemove(v.id)} style={{ background:"none", border:"none", color:"#e03131", cursor:"pointer", fontSize:14, padding:"0 4px", fontWeight:700 }}>×</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Schichtplaner() {
+  const [loaded,setLoaded]=useState(false);
+  const [staffList,setStaffList]=useState(DEFAULT_STAFF);
+  const [assignments,setAssignments]=useState({});
+  const [vacations,setVacations]=useState([]);
+  const [weekStart,setWeekStart]=useState(()=>getMonday(new Date()));
+
+  const [activeDay,setActiveDay]=useState(0);
+  const [view,setView]=useState("station");
+  const [selectedStaff,setSelectedStaff]=useState(null);
+  const [editingCell,setEditingCell]=useState(null);
+  const [editingAv,setEditingAv]=useState(null);
+  const [tab,setTab]=useState("plan");
+
+  useEffect(()=>{(()=>{
+    const st=loadData("praxis-staff",DEFAULT_STAFF);
+    const va=loadData("praxis-vacations",[]);
+    const wk=weekKey(weekStart);
+    const as=loadData(`praxis-${wk}`,null);
+    setStaffList(st); setVacations(va); setAssignments(as||buildDefaultAssignments());
+    setLoaded(true);
+  })();},[]);
+
+  useEffect(()=>{if(!loaded)return;(()=>{
+    const as=loadData(`praxis-${weekKey(weekStart)}`,null);
+    setAssignments(as||buildDefaultAssignments());
+  })();},[weekStart,loaded]);
+
+  const saveTimer=useRef(null);
+  useEffect(()=>{if(!loaded)return;
+    if(saveTimer.current)clearTimeout(saveTimer.current);
+    saveTimer.current=setTimeout(()=>{
+      saveData(`praxis-${weekKey(weekStart)}`,assignments);
+      saveData("praxis-staff",staffList);
+      saveData("praxis-vacations",vacations);
+    },500);
+    return()=>clearTimeout(saveTimer.current);
+  },[assignments,staffList,vacations,loaded,weekStart]);
+
+  const wsStr=fmtDate(weekStart);
+  const conflicts=useMemo(()=>findConflicts(assignments),[assignments]);
+  const violations=useMemo(()=>findViolations(assignments,staffList,vacations,wsStr),[assignments,staffList,vacations,wsStr]);
+
+  const handleCellClick=useCallback(key=>{
+    if(selectedStaff){
+      setAssignments(prev=>{const n={...prev};const c=n[key]||[];
+        if(c.includes(selectedStaff)){n[key]=c.filter(id=>id!==selectedStaff);if(!n[key].length)delete n[key];}
+        else n[key]=[...c,selectedStaff]; return n;});
+    } else setEditingCell(key);
+  },[selectedStaff]);
+
+  const removeFromCell=useCallback((ck,sid)=>{setAssignments(prev=>{const n={...prev};n[ck]=(n[ck]||[]).filter(id=>id!==sid);if(!n[ck].length)delete n[ck];return n;});},[]);
+  const addToCell=useCallback((ck,sid)=>{setAssignments(prev=>{const n={...prev};const c=n[ck]||[];if(!c.includes(sid))n[ck]=[...c,sid];return n;});},[]);
+
+  const prevWeek=()=>{const d=new Date(weekStart);d.setDate(d.getDate()-7);setWeekStart(d);};
+  const nextWeek=()=>{const d=new Date(weekStart);d.setDate(d.getDate()+7);setWeekStart(d);};
+  const thisWeek=()=>setWeekStart(getMonday(new Date()));
+  const wEnd=new Date(weekStart); wEnd.setDate(wEnd.getDate()+4);
+
+  const copyWeek=async()=>{
+    const nw=new Date(weekStart);nw.setDate(nw.getDate()+7);
+    saveData(`praxis-${weekKey(nw)}`,assignments);
+    setWeekStart(nw);
+  };
+
+  if(!loaded) return <div style={{ padding:40, textAlign:"center", color:"#868e96", fontFamily:"system-ui" }}>Laden…</div>;
+
+  return (
+    <div style={{ fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif', maxWidth:1120, margin:"0 auto", padding:16, color:"#212529", minHeight:"100vh" }}>
+      <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4, flexWrap:"wrap", gap:8 }}>
+        <div>
+          <h1 style={{ fontSize:20, fontWeight:800, margin:0, letterSpacing:-0.5 }}>Schichtplaner</h1>
+          <p style={{ margin:"2px 0 0", fontSize:11, color:"#868e96" }}>Zahnarztpraxis</p>
+        </div>
+        <div style={{ display:"flex", gap:4, alignItems:"center", flexWrap:"wrap" }}>
+          {conflicts.size>0&&<span style={{ background:"#fff0f0", color:"#e03131", padding:"3px 9px", borderRadius:5, fontSize:10, fontWeight:600 }}>⚠ {conflicts.size} Konflikte</span>}
+          {violations.size>0&&<span style={{ background:"#fff8e1", color:"#f57f17", padding:"3px 9px", borderRadius:5, fontSize:10, fontWeight:600 }}>⏰ {violations.size} Verfügbarkeit</span>}
+          <span style={{ fontSize:10, color:"#adb5bd", padding:"3px 8px", background:"#f8f9fa", borderRadius:5 }}>Auto-gespeichert</span>
+        </div>
+      </div>
+
+      <div style={{ display:"flex", gap:1, marginBottom:14, borderBottom:"2px solid #e9ecef" }}>
+        {[["plan","Schichtplan"],["vacation","Urlaub & Abwesenheit"],["team","Team & Verfügbarkeit"]].map(([k,label])=>(
+          <button key={k} onClick={()=>{setTab(k);if(k!=="plan")setSelectedStaff(null);}} style={{ padding:"8px 16px", fontSize:12, fontWeight:tab===k?700:500, color:tab===k?"#212529":"#868e96", background:"transparent", border:"none", borderBottom:tab===k?"2px solid #212529":"2px solid transparent", cursor:"pointer", marginBottom:-2 }}>{label}</button>
+        ))}
+      </div>
+
+      {tab==="plan"&&<>
+        <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:10, flexWrap:"wrap" }}>
+          <button onClick={prevWeek} style={{ padding:"5px 10px", borderRadius:5, border:"1px solid #dee2e6", background:"#fff", cursor:"pointer", fontSize:14, fontWeight:600 }}>‹</button>
+          <button onClick={thisWeek} style={{ padding:"5px 10px", borderRadius:5, border:"1px solid #dee2e6", background:"#fff", cursor:"pointer", fontSize:11, fontWeight:500, color:"#495057" }}>Heute</button>
+          <button onClick={nextWeek} style={{ padding:"5px 10px", borderRadius:5, border:"1px solid #dee2e6", background:"#fff", cursor:"pointer", fontSize:14, fontWeight:600 }}>›</button>
+          <span style={{ fontSize:13, fontWeight:600 }}>{fmtDateDE(wsStr)} – {fmtDateDE(fmtDate(wEnd))}</span>
+          <button onClick={copyWeek} style={{ padding:"5px 10px", borderRadius:5, border:"1px solid #dee2e6", background:"#fff", cursor:"pointer", fontSize:10, fontWeight:500, color:"#495057", marginLeft:4 }} title="Aktuelle Woche in die nächste kopieren">→ Woche kopieren</button>
+          <div style={{ flex:1 }} />
+          <button onClick={()=>{setView("station");setSelectedStaff(null);}} style={{ padding:"5px 12px", borderRadius:5, border:"1px solid #dee2e6", background:view==="station"?"#212529":"#fff", color:view==="station"?"#fff":"#495057", fontSize:11, fontWeight:600, cursor:"pointer" }}>Stationen</button>
+          <button onClick={()=>setView("person")} style={{ padding:"5px 12px", borderRadius:5, border:"1px solid #dee2e6", background:view==="person"?"#212529":"#fff", color:view==="person"?"#fff":"#495057", fontSize:11, fontWeight:600, cursor:"pointer" }}>Personal</button>
+        </div>
+
+        {view==="station"&&<>
+          <div style={{ display:"flex", gap:1, marginBottom:8, borderBottom:"1px solid #e9ecef" }}>
+            {DAYS.map((d,i)=>{const dt=new Date(weekStart);dt.setDate(dt.getDate()+i);return(
+              <button key={d} onClick={()=>setActiveDay(i)} style={{ padding:"6px 14px", fontSize:12, fontWeight:activeDay===i?700:500, color:activeDay===i?"#212529":"#868e96", background:"transparent", border:"none", borderBottom:activeDay===i?"2px solid #212529":"2px solid transparent", cursor:"pointer", marginBottom:-1 }}>{d} <span style={{ fontSize:10, color:"#adb5bd" }}>{dt.getDate()}.</span></button>
+            );})}
+          </div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:8, padding:"6px 8px", background:"#f8f9fa", borderRadius:7, alignItems:"center" }}>
+            <span style={{ fontSize:9.5, color:"#868e96", fontWeight:600, marginRight:3 }}>Zuweisen:</span>
+            {staffList.map(s=>{
+              const avail=isAvailable(s,activeDay,"08:00",vacations,wsStr);
+              return <button key={s.id} onClick={()=>setSelectedStaff(selectedStaff===s.id?null:s.id)} style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:5, border:selectedStaff===s.id?`2px solid ${s.color}`:"1.5px solid #dee2e6", background:selectedStaff===s.id?s.color+"18":"#fff", color:avail?s.color:"#bbb", fontSize:10.5, fontWeight:600, cursor:"pointer", opacity:avail?1:0.45, textDecoration:avail?"none":"line-through" }}>
+                <span style={{ width:6, height:6, borderRadius:"50%", background:avail?s.color:"#ccc" }} />{s.name}
+              </button>;
+            })}
+            {selectedStaff&&<button onClick={()=>setSelectedStaff(null)} style={{ padding:"2px 7px", borderRadius:5, border:"1.5px solid #e03131", background:"#fff0f0", color:"#e03131", fontSize:10, fontWeight:600, cursor:"pointer", marginLeft:3 }}>✕</button>}
+          </div>
+          {selectedStaff&&<div style={{ marginBottom:6, padding:"5px 10px", background:(staffList.find(x=>x.id===selectedStaff)?.color||"#000")+"10", borderRadius:5, fontSize:10.5, color:staffList.find(x=>x.id===selectedStaff)?.color, fontWeight:500 }}>Klicke auf Zellen um <strong>{staffList.find(x=>x.id===selectedStaff)?.name}</strong> zuzuweisen / entfernen</div>}
+          <StationGrid day={activeDay} assignments={assignments} conflicts={conflicts} violations={violations} onCellClick={handleCellClick} selectedStaff={selectedStaff} staffList={staffList} />
+          <div style={{ display:"flex", gap:12, marginTop:8, fontSize:10, color:"#868e96" }}>
+            <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:10, height:10, borderRadius:2, background:"#fff0f0", border:"1px solid #ffcdd2" }} /> Konflikt</span>
+            <span style={{ display:"flex", alignItems:"center", gap:4 }}><span style={{ width:10, height:10, borderRadius:2, background:"#fff8e1", border:"1px solid #fff3c4" }} /> Außerhalb Verfügbarkeit</span>
+          </div>
+        </>}
+
+        {view==="person"&&<div>
+          <div style={{ display:"flex", flexWrap:"wrap", gap:3, marginBottom:12, padding:"6px 8px", background:"#f8f9fa", borderRadius:7 }}>
+            {staffList.map(s=>(
+              <button key={s.id} onClick={()=>setSelectedStaff(s.id)} style={{ display:"inline-flex", alignItems:"center", gap:3, padding:"2px 7px", borderRadius:5, border:selectedStaff===s.id?`2px solid ${s.color}`:"1.5px solid #dee2e6", background:selectedStaff===s.id?s.color+"15":"#fff", color:selectedStaff===s.id?s.color:"#495057", fontSize:10.5, fontWeight:600, cursor:"pointer" }}>
+                <span style={{ width:6, height:6, borderRadius:"50%", background:s.color }} />{s.name}
+                <span style={{ fontSize:9, color:"#868e96", fontWeight:400 }}>{getWeeklyHours(assignments,s.id)}h</span>
+              </button>
+            ))}
+          </div>
+          {selectedStaff?<PersonView staffId={selectedStaff} assignments={assignments} staffList={staffList} />:<div style={{ textAlign:"center", padding:40, color:"#868e96", fontSize:12 }}>Person auswählen</div>}
+        </div>}
+      </>}
+
+      {tab==="vacation"&&<VacationManager staffList={staffList} vacations={vacations} onAdd={v=>setVacations(prev=>[...prev,v])} onRemove={id=>setVacations(prev=>prev.filter(x=>x.id!==id))} />}
+
+      {tab==="team"&&<div>
+        {editingAv?<AvailabilityEditor staff={editingAv} onCancel={()=>setEditingAv(null)} onSave={u=>{setStaffList(prev=>prev.map(s=>s.id===u.id?u:s));setEditingAv(null);}} />
+        :<div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap:8 }}>
+          {staffList.map(s=>(
+            <div key={s.id} onClick={()=>setEditingAv(s)} style={{ padding:12, borderRadius:8, border:"1px solid #e9ecef", cursor:"pointer", background:"#fff", transition:"border-color 0.12s" }} onMouseEnter={e=>e.currentTarget.style.borderColor=s.color} onMouseLeave={e=>e.currentTarget.style.borderColor="#e9ecef"}>
+              <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:8 }}>
+                <div style={{ width:28, height:28, borderRadius:7, background:s.color+"20", display:"flex", alignItems:"center", justifyContent:"center", fontSize:13, fontWeight:700, color:s.color }}>{s.name[0]}</div>
+                <div>
+                  <div style={{ fontWeight:700, fontSize:13 }}>{s.name}</div>
+                  <div style={{ fontSize:10, color:"#868e96" }}>max. {s.maxHours}h / Woche · {s.vacDays??26} Urlaubstage · {getWeeklyHours(assignments,s.id)}h geplant</div>
+                </div>
+              </div>
+              <div style={{ display:"flex", gap:3, flexWrap:"wrap" }}>
+                {DAYS.map((d,di)=>{const av=s.availability?.[di]; return <span key={di} style={{ fontSize:9, padding:"2px 5px", borderRadius:4, background:av?s.color+"10":"#f5f5f5", color:av?s.color:"#ccc", fontWeight:600 }}>{DAY_SHORT[di]}{av?` ${av.from}–${av.to}`:""}</span>;})}
+              </div>
+              <div style={{ marginTop:6, fontSize:10, color:s.color, fontWeight:500 }}>✎ Bearbeiten</div>
+            </div>
+          ))}
+        </div>}
+      </div>}
+
+      {editingCell&&!selectedStaff&&tab==="plan"&&(
+        <div onClick={()=>setEditingCell(null)} style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.35)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:100 }}>
+          <div onClick={e=>e.stopPropagation()} style={{ background:"#fff", borderRadius:12, padding:20, width:320, maxHeight:"80vh", overflow:"auto", boxShadow:"0 20px 60px rgba(0,0,0,0.2)" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 }}>
+              <h3 style={{ margin:0, fontSize:14, fontWeight:700 }}>Zuweisung bearbeiten</h3>
+              <button onClick={()=>setEditingCell(null)} style={{ background:"none", border:"none", fontSize:18, cursor:"pointer", color:"#868e96" }}>×</button>
+            </div>
+            <div style={{ fontSize:11, color:"#868e96", marginBottom:8 }}>{(()=>{const p=editingCell.split("-");return `${DAYS[p[0]]} · ${STATIONS.find(s=>s.id===p[1])?.label||p[1]} · ${p[3]}`;})()}</div>
+            <div style={{ marginBottom:10 }}>
+              <div style={{ fontSize:10, fontWeight:600, color:"#868e96", marginBottom:3 }}>Aktuell:</div>
+              {(assignments[editingCell]||[]).length===0?<div style={{ fontSize:11, color:"#ced4da", fontStyle:"italic" }}>Niemand</div>:(
+                <div style={{ display:"flex", flexWrap:"wrap", gap:3 }}>{(assignments[editingCell]||[]).map(sid=><Chip key={sid} staffId={sid} onRemove={id=>removeFromCell(editingCell,id)} staffList={staffList} />)}</div>
+              )}
+            </div>
+            <div>
+              <div style={{ fontSize:10, fontWeight:600, color:"#868e96", marginBottom:3 }}>Hinzufügen:</div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:2 }}>
+                {staffList.filter(s=>!(assignments[editingCell]||[]).includes(s.id)).map(s=>{
+                  const p=editingCell.split("-");
+                  const avail=isAvailable(s,parseInt(p[0]),p[3],vacations,wsStr);
+                  return <button key={s.id} onClick={()=>addToCell(editingCell,s.id)} style={{ display:"inline-flex", alignItems:"center", gap:2, padding:"2px 6px", borderRadius:4, border:`1px solid ${avail?s.color+"44":"#e9ecef"}`, background:avail?"#fff":"#f8f9fa", color:avail?s.color:"#bbb", fontSize:10.5, fontWeight:600, cursor:"pointer" }}>+ {s.name}{!avail&&<span style={{ fontSize:8 }}>⛔</span>}</button>;
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Schichtplaner));
+</script>
+</body>
+</html>
