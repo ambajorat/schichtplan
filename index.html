@@ -130,15 +130,14 @@ function getRoles(staff) {
 function getPracticeHoursForDay(practiceHours, weekStartStr, dayIdx) {
   var dt = new Date(weekStartStr + "T00:00:00");
   dt.setDate(dt.getDate() + dayIdx);
-  var ds = dt.toISOString().slice(0, 10);
-  // Find matching special period (last match wins)
+  var ds = fmtDate(dt);
   var match = null;
   (practiceHours || []).forEach(function (p) {
     if (ds >= p.from && ds <= p.to && p.hours && p.hours[dayIdx]) {
       match = p.hours[dayIdx];
     }
   });
-  return match; // null = normal hours
+  return match;
 }
 const DEFAULT_STAFF = [{
   id: "martina",
@@ -756,7 +755,7 @@ function isAvailable(staff, dayIdx, time, vacations, wsStr) {
   if (wsStr && vacations) {
     const d = new Date(wsStr + "T00:00:00");
     d.setDate(d.getDate() + dayIdx);
-    const ds = d.toISOString().slice(0, 10);
+    const ds = fmtDate(d);
     for (const v of vacations) {
       if (v.staffId === staff.id && ds >= v.from && ds <= v.to) return false;
     }
@@ -872,7 +871,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       if (!av) return;
       var dt = new Date(weekStartStr + "T00:00:00");
       dt.setDate(dt.getDate() + di);
-      var ds = dt.toISOString().slice(0, 10);
+      var ds = fmtDate(dt);
       var onLeave = false;
       vacations.forEach(function (v) {
         if (v.staffId === s.id && ds >= v.from && ds <= v.to) onLeave = true;
@@ -3060,7 +3059,7 @@ function PracticeHoursManager({
   const sorted = [...(hours || [])].sort(function (a, b) {
     return a.from.localeCompare(b.from);
   });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = fmtDate(new Date());
   return /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 20
@@ -3353,7 +3352,7 @@ function VacationCalendar({
 }) {
   const [calYear, setCalYear] = useState(new Date().getFullYear());
   const months = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = fmtDate(new Date());
   // Days in each month
   function daysInMonth(m, y) {
     return new Date(y, m + 1, 0).getDate();
@@ -3588,7 +3587,7 @@ function VacationManager({
   const [to, setTo] = useState("");
   const [note, setNote] = useState("Urlaub");
   const sorted = [...vacations].sort((a, b) => a.from.localeCompare(b.from));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = fmtDate(new Date());
   const vacDays = {};
   staffList.forEach(s => {
     var _s$vacDays;
@@ -4493,7 +4492,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.3"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.4"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -4918,7 +4917,7 @@ function Schichtplaner() {
   })), (() => {
     const dt = new Date(weekStart);
     dt.setDate(dt.getDate() + activeDay);
-    const ds = dt.toISOString().slice(0, 10);
+    const ds = fmtDate(dt);
     const absent = vacations.filter(v => ds >= v.from && ds <= v.to).map(v => {
       const s = staffList.find(x => x.id === v.staffId);
       return s ? {
@@ -5928,7 +5927,7 @@ function Schichtplaner() {
     });
     const dt = new Date(wsStr + "T00:00:00");
     dt.setDate(dt.getDate() + shiftModal.day);
-    const ds = dt.toISOString().slice(0, 10);
+    const ds = fmtDate(dt);
     const absence = vacations.find(v => v.staffId === s.id && ds >= v.from && ds <= v.to);
     const abIcons = {
       Krank: "\u{1F912}",
@@ -6025,7 +6024,7 @@ function Schichtplaner() {
     })()), (() => {
       const dt = new Date(weekStart);
       dt.setDate(dt.getDate() + di);
-      const ds = dt.toISOString().slice(0, 10);
+      const ds = fmtDate(dt);
       const absent = vacations.filter(v => ds >= v.from && ds <= v.to).map(v => {
         const s = staffList.find(x => x.id === v.staffId);
         return s ? {
