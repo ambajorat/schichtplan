@@ -810,7 +810,7 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
     txt += `${dayEmoji[di]} *${dn}:* ${parts.join(", ")}\n`;
   });
   txt += `\n📱 Dein Plan im Browser:\n${link}`;
-  const teamLink = buildTeamLink(assignments, staff, weekStart);
+  const teamLink = buildTeamLink(assignments, staffList, weekStart);
   txt += `\n\n👥 Gesamtplan:\n${teamLink}`;
   txt += `\n\n✅ Gute Woche!`;
   return txt;
@@ -1199,15 +1199,15 @@ function StationGrid({
   violations,
   onCellClick,
   selectedStaff,
-  staffList,
-  clickState
+  staffList
 }) {
   const dynSlots = getDynSlots(assignments, day);
+  const stBg = ["#e8f4fd", "#fef9ee", "#f0faf4", "#fef4f4", "#f3eefa", "#fef9ee", "#e8f4fd", "#fef4f4", "#f9f0f0"];
   return /*#__PURE__*/React.createElement("div", {
     style: {
       overflowX: "auto",
       borderRadius: 8,
-      border: "1px solid #e9ecef"
+      border: "2px solid #adb5bd"
     },
     className: "grid-wrap"
   }, /*#__PURE__*/React.createElement("table", {
@@ -1222,27 +1222,28 @@ function StationGrid({
       width: 52,
       position: "sticky",
       left: 0,
-      background: "#f5f6f7",
+      background: "#e9ecef",
       zIndex: 2,
-      borderBottom: "2px solid #dee2e6",
-      padding: "6px 4px",
-      fontSize: 9.5,
-      color: "#6c757d",
+      borderBottom: "2px solid #868e96",
+      borderRight: "2px solid #868e96",
+      padding: "7px 4px",
+      fontSize: 10,
+      color: "#212529",
       textAlign: "left",
       fontWeight: 700
     }
-  }, "Zeit"), STATIONS.map(st => /*#__PURE__*/React.createElement("th", {
+  }, "Zeit"), STATIONS.map((st, si) => /*#__PURE__*/React.createElement("th", {
     key: st.id,
     colSpan: dynSlots[st.id] || 1,
     style: {
-      borderBottom: "2px solid #dee2e6",
-      borderLeft: "1px solid #e0e2e5",
-      padding: "6px 3px",
-      fontSize: 9.5,
+      borderBottom: "2px solid #868e96",
+      borderLeft: "2px solid #868e96",
+      padding: "7px 4px",
+      fontSize: 10,
       fontWeight: 700,
-      color: "#495057",
+      color: "#212529",
       textAlign: "center",
-      background: "#f5f6f7"
+      background: stBg[si] || "#f5f6f7"
     }
   }, st.label)))), /*#__PURE__*/React.createElement("tbody", null, TIME_SLOTS.map((slot, si) => /*#__PURE__*/React.createElement("tr", {
     key: slot.start
@@ -1256,11 +1257,11 @@ function StationGrid({
       fontSize: 9,
       color: "#868e96",
       fontVariantNumeric: "tabular-nums",
-      borderRight: "1px solid #e9ecef",
-      borderBottom: "1px solid #f1f3f5",
+      borderRight: "2px solid #868e96",
+      borderBottom: slot.start.endsWith(":00") ? "1px solid #ccc" : "1px solid #f1f3f5",
       whiteSpace: "nowrap"
     }
-  }, slot.start), STATIONS.flatMap(st => Array.from({
+  }, slot.start), STATIONS.flatMap((st, stIdx) => Array.from({
     length: dynSlots[st.id] || 1
   }, (_, idx) => {
     var _staffList$find;
@@ -1269,18 +1270,17 @@ function StationGrid({
     const isCon = conflicts.has(key),
       isVio = violations.has(key);
     const selColor = selectedStaff ? (_staffList$find = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find === void 0 ? void 0 : _staffList$find.color : null;
-    const isInRange = clickState && clickState.day === day && clickState.station === st.id && slot.start >= clickState.time;
     return /*#__PURE__*/React.createElement("td", {
       key: `${st.id}-${idx}`,
       onClick: () => onCellClick(key),
       style: {
-        borderLeft: idx === 0 ? "1px solid #e0e2e5" : "1px solid #f1f3f5",
-        borderBottom: "1px solid #f1f3f5",
+        borderLeft: idx === 0 ? "2px solid #868e96" : "1px solid #dee2e6",
+        borderBottom: slot.start.endsWith(":00") ? "1px solid #ccc" : "1px solid #f1f3f5",
         padding: "1px 2px",
         minWidth: 52,
         height: 21,
         cursor: "pointer",
-        background: isCon ? "#fff0f0" : isVio ? "#fff8e1" : isInRange && selColor ? selColor + "18" : selectedStaff && assigned.includes(selectedStaff) ? selColor + "15" : "transparent"
+        background: isCon ? "#fff0f0" : isVio ? "#fff8e1" : selectedStaff && assigned.includes(selectedStaff) ? selColor + "15" : "transparent"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -2093,7 +2093,7 @@ function ShareModal({
   }, "Alle per WhatsApp senden")));
 }
 function Schichtplaner() {
-  var _staffList$find2, _staffList$find3, _STATIONS$find;
+  var _STATIONS$find;
   // Check for read-only plan link
   const [roData, setRoData] = useState(null);
   const [roTeam, setRoTeam] = useState(null);
@@ -2133,22 +2133,14 @@ function Schichtplaner() {
   const [activeDay, setActiveDay] = useState(0);
   const [view, setView] = useState("station");
   const [selectedStaff, setSelectedStaff] = useState(null);
-  const [editingCell, setEditingCell] = useState(null);
   const [editingAv, setEditingAv] = useState(null);
   const [tab, setTab] = useState("plan");
   const [showShare, setShowShare] = useState(false);
 
-  // Shift entry
-  const [shiftStaff, setShiftStaff] = useState("");
-  const [shiftDay, setShiftDay] = useState(0);
-  const [shiftStation, setShiftStation] = useState("empfang");
-  const [shiftFrom, setShiftFrom] = useState("08:00");
-  const [shiftTo, setShiftTo] = useState("14:00");
-  const [clickState, setClickState] = useState(null); // null | {day,station,time} = waiting for 2nd click
-
-  useEffect(() => {
-    setShiftDay(activeDay);
-  }, [activeDay]);
+  // Shift modal
+  const [shiftModal, setShiftModal] = useState(null);
+  const [smFrom, setSmFrom] = useState("08:00");
+  const [smTo, setSmTo] = useState("14:00");
   useEffect(() => {
     (() => {
       const st = loadData("praxis-staff", DEFAULT_STAFF);
@@ -2179,29 +2171,28 @@ function Schichtplaner() {
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
-  const addShift = useCallback(() => {
-    if (!shiftStaff) return;
+  const addShiftFromModal = useCallback(staffId => {
+    if (!shiftModal || !staffId) return;
     setAssignments(prev => {
       const n = {
         ...prev
       };
-      const slot = findFreeSlot(n, shiftDay, shiftStation, shiftFrom, shiftTo);
-      TIME_SLOTS.filter(s => s.start >= shiftFrom && s.start < shiftTo).forEach(sl => {
-        const k = `${shiftDay}-${shiftStation}-${slot}-${sl.start}`;
-        n[k] = [shiftStaff];
+      const slot = findFreeSlot(n, shiftModal.day, shiftModal.station, smFrom, smTo);
+      TIME_SLOTS.filter(s => s.start >= smFrom && s.start < smTo).forEach(sl => {
+        n[`${shiftModal.day}-${shiftModal.station}-${slot}-${sl.start}`] = [staffId];
       });
       return n;
     });
-    setActiveDay(shiftDay);
-  }, [shiftStaff, shiftDay, shiftStation, shiftFrom, shiftTo]);
-  const removePersonDay = useCallback((staffId, day) => {
+    setShiftModal(null);
+  }, [shiftModal, smFrom, smTo]);
+  const removePersonStation = useCallback((staffId, day, station) => {
     setAssignments(prev => {
       const n = {
         ...prev
       };
       Object.keys(n).forEach(k => {
         const p = k.split("-");
-        if (parseInt(p[0]) === day && n[k]) {
+        if (parseInt(p[0]) === day && p[1] === station && n[k]) {
           n[k] = n[k].filter(id => id !== staffId);
           if (!n[k].length) delete n[k];
         }
@@ -2211,86 +2202,11 @@ function Schichtplaner() {
   }, []);
   const handleCellClick = useCallback(key => {
     const p = key.split("-");
-    const day = parseInt(p[0]),
-      station = p[1],
-      time = p[3];
-    if (selectedStaff) {
-      if (!clickState) {
-        // First click: set start
-        setClickState({
-          day,
-          station,
-          time
-        });
-        setShiftDay(day);
-        setShiftStation(station);
-        setShiftFrom(time);
-        setShiftTo(addEnd(time));
-        setActiveDay(day);
-      } else {
-        // Second click
-        if (clickState.day === day && clickState.station === station) {
-          // Same station: set end time
-          const t1 = timeToMin(clickState.time),
-            t2 = timeToMin(time);
-          const fromT = Math.min(t1, t2),
-            toT = Math.max(t1, t2) + 30;
-          const fH = Math.floor(fromT / 60),
-            fM = fromT % 60,
-            tH = Math.floor(toT / 60),
-            tM = toT % 60;
-          const from = `${String(fH).padStart(2, "0")}:${String(fM).padStart(2, "0")}`;
-          const to = `${String(tH).padStart(2, "0")}:${String(tM).padStart(2, "0")}`;
-          setShiftFrom(from);
-          setShiftTo(to);
-          // Auto-add the shift
-          setAssignments(prev => {
-            const n = {
-              ...prev
-            };
-            const slot = findFreeSlot(n, day, station, from, to);
-            TIME_SLOTS.filter(s => s.start >= from && s.start < to).forEach(sl => {
-              n[`${day}-${station}-${slot}-${sl.start}`] = [selectedStaff];
-            });
-            return n;
-          });
-          setClickState(null);
-        } else {
-          // Different station or day: restart with new first click
-          setClickState({
-            day,
-            station,
-            time
-          });
-          setShiftDay(day);
-          setShiftStation(station);
-          setShiftFrom(time);
-          setShiftTo(addEnd(time));
-          setActiveDay(day);
-        }
-      }
-    } else {
-      setEditingCell(key);
-    }
-  }, [selectedStaff, clickState]);
-  const removeFromCell = useCallback((ck, sid) => {
-    setAssignments(prev => {
-      const n = {
-        ...prev
-      };
-      n[ck] = (n[ck] || []).filter(id => id !== sid);
-      if (!n[ck].length) delete n[ck];
-      return n;
-    });
-  }, []);
-  const addToCell = useCallback((ck, sid) => {
-    setAssignments(prev => {
-      const n = {
-        ...prev
-      };
-      const c = n[ck] || [];
-      if (!c.includes(sid)) n[ck] = [...c, sid];
-      return n;
+    setShiftModal({
+      day: parseInt(p[0]),
+      station: p[1],
+      slotIdx: parseInt(p[2]),
+      time: p[3]
     });
   }, []);
   const prevWeek = () => {
@@ -2332,7 +2248,21 @@ function Schichtplaner() {
   }, /*#__PURE__*/React.createElement("style", {
     dangerouslySetInnerHTML: {
       __html: `
-      @media print { .no-print{display:none!important} body{background:#fff;margin:0} .grid-wrap{border:none!important} table{font-size:9px!important} th,td{padding:2px 3px!important} }
+      @media print {
+        .no-print{display:none!important}
+        .print-only{display:block!important}
+        body{background:#fff;margin:0;font-size:9px}
+        .grid-wrap{border:none!important;page-break-inside:avoid}
+        table{font-size:8px!important}
+        th,td{padding:1px 2px!important}
+        .print-day{page-break-inside:avoid;margin-bottom:8px}
+        .print-day table{width:100%;border-collapse:collapse}
+        .print-day th{background:#f0f0f0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:7px;padding:2px 3px!important;border:0.5px solid #ccc}
+        .print-day td{font-size:8px;padding:2px 3px!important;border:0.5px solid #ddd;height:14px}
+        .print-chip{font-size:7px!important;padding:1px 3px!important;border-radius:3px!important;border-width:1px!important}
+        @page{size:landscape;margin:8mm}
+      }
+      .print-only{display:none}
     `
     }
   }), /*#__PURE__*/React.createElement("div", {
@@ -2443,7 +2373,9 @@ function Schichtplaner() {
       cursor: "pointer",
       marginBottom: -2
     }
-  }, label))), tab === "plan" && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, label))), tab === "plan" && /*#__PURE__*/React.createElement("div", {
+    className: "no-print"
+  }, /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -2568,173 +2500,6 @@ function Schichtplaner() {
     }, dt.getDate(), "."));
   })), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 6,
-      marginBottom: 10,
-      padding: "10px 12px",
-      background: "#f8f9fa",
-      borderRadius: 8,
-      alignItems: "flex-end",
-      border: "1px solid #e9ecef"
-    },
-    className: "no-print"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#6c757d",
-      display: "block",
-      marginBottom: 2
-    }
-  }, "Person"), /*#__PURE__*/React.createElement("select", {
-    value: shiftStaff,
-    onChange: e => {
-      setShiftStaff(e.target.value);
-      setSelectedStaff(e.target.value || null);
-      setClickState(null);
-    },
-    style: {
-      padding: "5px 8px",
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 12,
-      minWidth: 100
-    }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: ""
-  }, "—"), staffList.map(s => /*#__PURE__*/React.createElement("option", {
-    key: s.id,
-    value: s.id
-  }, s.name)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#6c757d",
-      display: "block",
-      marginBottom: 2
-    }
-  }, "Tag"), /*#__PURE__*/React.createElement("select", {
-    value: shiftDay,
-    onChange: e => {
-      setShiftDay(parseInt(e.target.value));
-      setActiveDay(parseInt(e.target.value));
-    },
-    style: {
-      padding: "5px 8px",
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 12
-    }
-  }, DAYS.map((d, i) => /*#__PURE__*/React.createElement("option", {
-    key: i,
-    value: i
-  }, DAY_SHORT[i])))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#6c757d",
-      display: "block",
-      marginBottom: 2
-    }
-  }, "Station"), /*#__PURE__*/React.createElement("select", {
-    value: shiftStation,
-    onChange: e => setShiftStation(e.target.value),
-    style: {
-      padding: "5px 8px",
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 12
-    }
-  }, STATIONS.map(st => /*#__PURE__*/React.createElement("option", {
-    key: st.id,
-    value: st.id
-  }, st.label)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#6c757d",
-      display: "block",
-      marginBottom: 2
-    }
-  }, "Von"), /*#__PURE__*/React.createElement("select", {
-    value: shiftFrom,
-    onChange: e => setShiftFrom(e.target.value),
-    style: {
-      padding: "5px 8px",
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 12,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, TIME_SLOTS.map(s => /*#__PURE__*/React.createElement("option", {
-    key: s.start,
-    value: s.start
-  }, s.start)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#6c757d",
-      display: "block",
-      marginBottom: 2
-    }
-  }, "Bis"), /*#__PURE__*/React.createElement("select", {
-    value: shiftTo,
-    onChange: e => setShiftTo(e.target.value),
-    style: {
-      padding: "5px 8px",
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 12,
-      fontVariantNumeric: "tabular-nums"
-    }
-  }, TIME_SLOTS.filter(s => s.start > shiftFrom).map(s => /*#__PURE__*/React.createElement("option", {
-    key: s.start,
-    value: s.start
-  }, s.start)), /*#__PURE__*/React.createElement("option", {
-    value: "20:00"
-  }, "20:00"))), /*#__PURE__*/React.createElement("button", {
-    onClick: addShift,
-    disabled: !shiftStaff,
-    style: {
-      padding: "6px 14px",
-      borderRadius: 6,
-      border: "none",
-      background: shiftStaff ? "#212529" : "#dee2e6",
-      color: shiftStaff ? "#fff" : "#868e96",
-      fontSize: 12,
-      fontWeight: 600,
-      cursor: shiftStaff ? "pointer" : "default",
-      height: 30
-    }
-  }, "+ Schicht"), shiftStaff && /*#__PURE__*/React.createElement("button", {
-    onClick: () => removePersonDay(shiftStaff, shiftDay),
-    style: {
-      padding: "6px 14px",
-      borderRadius: 6,
-      border: "1px solid #e03131",
-      background: "#fff",
-      color: "#e03131",
-      fontSize: 12,
-      fontWeight: 600,
-      cursor: "pointer",
-      height: 30
-    }
-  }, "Tag löschen"), clickState && /*#__PURE__*/React.createElement("button", {
-    onClick: () => setClickState(null),
-    style: {
-      padding: "6px 14px",
-      borderRadius: 6,
-      border: "1px solid #868e96",
-      background: "#fff",
-      color: "#868e96",
-      fontSize: 12,
-      fontWeight: 600,
-      cursor: "pointer",
-      height: 30
-    }
-  }, "✕ Abbrechen")), shiftStaff && !clickState && /*#__PURE__*/React.createElement("div", {
-    style: {
       marginBottom: 6,
       padding: "5px 10px",
       background: "#f0f7ff",
@@ -2744,26 +2509,14 @@ function Schichtplaner() {
       fontWeight: 500
     },
     className: "no-print"
-  }, "Klicke eine Zelle als Startpunkt, dann eine zweite in derselben Station als Endpunkt — die Schicht wird automatisch eingetragen."), clickState && /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 6,
-      padding: "5px 10px",
-      background: (((_staffList$find2 = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find2 === void 0 ? void 0 : _staffList$find2.color) || "#4A90D9") + "15",
-      borderRadius: 5,
-      fontSize: 10.5,
-      color: ((_staffList$find3 = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find3 === void 0 ? void 0 : _staffList$find3.color) || "#4A90D9",
-      fontWeight: 600
-    },
-    className: "no-print"
-  }, "Start: ", (_STATIONS$find = STATIONS.find(s => s.id === clickState.station)) === null || _STATIONS$find === void 0 ? void 0 : _STATIONS$find.label, " ab ", clickState.time, " — jetzt Endzelle klicken"), /*#__PURE__*/React.createElement(StationGrid, {
+  }, "Klicke auf eine Zelle, um eine Schicht einzutragen oder zu bearbeiten."), /*#__PURE__*/React.createElement(StationGrid, {
     day: activeDay,
     assignments: assignments,
     conflicts: conflicts,
     violations: violations,
     onCellClick: handleCellClick,
     selectedStaff: selectedStaff,
-    staffList: staffList,
-    clickState: clickState
+    staffList: staffList
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2863,7 +2616,136 @@ function Schichtplaner() {
       setStaffList(prev => prev.map(s => s.id === u.id ? u : s));
       setEditingAv(null);
     }
-  }) : /*#__PURE__*/React.createElement("div", {
+  }) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      flexWrap: "wrap",
+      alignItems: "flex-end",
+      marginBottom: 14,
+      padding: "12px 14px",
+      background: "#f8f9fa",
+      borderRadius: 8,
+      border: "1px solid #e9ecef"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6c757d",
+      width: "100%",
+      marginBottom: 2,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Neues Teammitglied"), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Name"), /*#__PURE__*/React.createElement("input", {
+    id: "new-staff-name",
+    type: "text",
+    placeholder: "Name",
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      width: 120
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Max. Std/Wo"), /*#__PURE__*/React.createElement("input", {
+    id: "new-staff-hours",
+    type: "number",
+    defaultValue: 30,
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      width: 70
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Urlaubstage"), /*#__PURE__*/React.createElement("input", {
+    id: "new-staff-vac",
+    type: "number",
+    defaultValue: 26,
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      width: 70
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Farbe"), /*#__PURE__*/React.createElement("input", {
+    id: "new-staff-color",
+    type: "color",
+    defaultValue: "#4A90D9",
+    style: {
+      padding: 0,
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      width: 36,
+      height: 30,
+      cursor: "pointer"
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      const nameEl = document.getElementById("new-staff-name");
+      const name = nameEl.value.trim();
+      if (!name) return;
+      const hours = parseInt(document.getElementById("new-staff-hours").value) || 30;
+      const vac = parseInt(document.getElementById("new-staff-vac").value) || 26;
+      const color = document.getElementById("new-staff-color").value;
+      const id = name.toLowerCase().replace(/[^a-z0-9]/g, "") + "-" + Date.now().toString(36);
+      setStaffList(prev => [...prev, {
+        id,
+        name,
+        color,
+        availability: {},
+        maxHours: hours,
+        vacDays: vac
+      }]);
+      nameEl.value = "";
+    },
+    style: {
+      padding: "6px 16px",
+      borderRadius: 6,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      height: 30
+    }
+  }, "+ Hinzufügen")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "grid",
       gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
@@ -2873,16 +2755,51 @@ function Schichtplaner() {
     var _s$vacDays3;
     return /*#__PURE__*/React.createElement("div", {
       key: s.id,
-      onClick: () => setEditingAv(s),
       style: {
         padding: 12,
         borderRadius: 8,
         border: "1px solid #e9ecef",
-        cursor: "pointer",
-        background: "#fff"
+        background: "#fff",
+        position: "relative"
       },
       onMouseEnter: e => e.currentTarget.style.borderColor = s.color,
       onMouseLeave: e => e.currentTarget.style.borderColor = "#e9ecef"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: e => {
+        e.stopPropagation();
+        if (confirm(`${s.name} wirklich entfernen? Alle Schichtzuweisungen gehen verloren.`)) {
+          setStaffList(prev => prev.filter(x => x.id !== s.id));
+          setAssignments(prev => {
+            const n = {};
+            Object.entries(prev).forEach(([k, sids]) => {
+              const filtered = sids.filter(id => id !== s.id);
+              if (filtered.length) n[k] = filtered;
+            });
+            return n;
+          });
+        }
+      },
+      style: {
+        position: "absolute",
+        top: 8,
+        right: 8,
+        background: "none",
+        border: "none",
+        color: "#ccc",
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 700,
+        padding: "0 4px",
+        lineHeight: 1
+      },
+      onMouseEnter: e => e.currentTarget.style.color = "#e03131",
+      onMouseLeave: e => e.currentTarget.style.color = "#ccc",
+      title: "Entfernen"
+    }, "×"), /*#__PURE__*/React.createElement("div", {
+      onClick: () => setEditingAv(s),
+      style: {
+        cursor: "pointer"
+      }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
@@ -2940,9 +2857,9 @@ function Schichtplaner() {
         color: s.color,
         fontWeight: 500
       }
-    }, "✎ Bearbeiten"));
-  }))), editingCell && !selectedStaff && tab === "plan" && /*#__PURE__*/React.createElement("div", {
-    onClick: () => setEditingCell(null),
+    }, "✎ Bearbeiten")));
+  })))), shiftModal && /*#__PURE__*/React.createElement("div", {
+    onClick: () => setShiftModal(null),
     style: {
       position: "fixed",
       inset: 0,
@@ -2957,111 +2874,336 @@ function Schichtplaner() {
     onClick: e => e.stopPropagation(),
     style: {
       background: "#fff",
-      borderRadius: 12,
-      padding: 20,
-      width: 320,
-      maxHeight: "80vh",
+      borderRadius: 14,
+      padding: 0,
+      width: 380,
+      maxHeight: "85vh",
       overflow: "auto",
       boxShadow: "0 20px 60px rgba(0,0,0,0.2)"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      padding: "14px 18px 10px",
+      borderBottom: "1px solid #e9ecef"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       display: "flex",
       justifyContent: "space-between",
-      alignItems: "center",
-      marginBottom: 10
+      alignItems: "center"
     }
   }, /*#__PURE__*/React.createElement("h3", {
     style: {
       margin: 0,
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: 700
     }
-  }, "Zuweisung bearbeiten"), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setEditingCell(null),
+  }, (_STATIONS$find = STATIONS.find(s => s.id === shiftModal.station)) === null || _STATIONS$find === void 0 ? void 0 : _STATIONS$find.label, " · ", DAYS[shiftModal.day]), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShiftModal(null),
     style: {
       background: "none",
       border: "none",
-      fontSize: 18,
+      fontSize: 20,
       cursor: "pointer",
-      color: "#868e96"
-    }
-  }, "×")), /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 11,
       color: "#868e96",
-      marginBottom: 8
+      padding: "0 4px"
     }
-  }, (_STATIONS$find2 => {
-    const p = editingCell.split("-");
-    return `${DAYS[p[0]]} · ${((_STATIONS$find2 = STATIONS.find(s => s.id === p[1])) === null || _STATIONS$find2 === void 0 ? void 0 : _STATIONS$find2.label) || p[1]} · ${p[3]}`;
+  }, "×")), (() => {
+    const ppl = {};
+    Object.entries(assignments).forEach(([k, sids]) => {
+      if (!(sids !== null && sids !== void 0 && sids.length)) return;
+      const p = k.split("-");
+      if (parseInt(p[0]) !== shiftModal.day || p[1] !== shiftModal.station) return;
+      sids.forEach(sid => {
+        if (!ppl[sid]) ppl[sid] = [];
+        ppl[sid].push(p[3]);
+      });
+    });
+    const entries = Object.entries(ppl);
+    if (entries.length === 0) return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#ced4da",
+        fontStyle: "italic",
+        marginTop: 6
+      }
+    }, "Noch niemand eingeteilt");
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 3
+      }
+    }, entries.map(([sid, times]) => {
+      const s = staffList.find(x => x.id === sid);
+      if (!s) return null;
+      times.sort();
+      const ranges = [];
+      let rs = times[0],
+        re = times[0];
+      for (let i = 1; i < times.length; i++) {
+        if (timeToMin(times[i]) === timeToMin(re) + 30) re = times[i];else {
+          ranges.push(`${rs}–${addEnd(re)}`);
+          rs = times[i];
+          re = times[i];
+        }
+      }
+      ranges.push(`${rs}–${addEnd(re)}`);
+      return /*#__PURE__*/React.createElement("div", {
+        key: sid,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "4px 8px",
+          borderRadius: 6,
+          background: s.color + "10"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: s.color,
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 12,
+          fontWeight: 600,
+          color: s.color,
+          flex: 1
+        }
+      }, s.name), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 10,
+          color: "#6c757d"
+        }
+      }, ranges.join(", ")), /*#__PURE__*/React.createElement("button", {
+        onClick: () => removePersonStation(sid, shiftModal.day, shiftModal.station),
+        style: {
+          background: "none",
+          border: "none",
+          color: "#e03131",
+          cursor: "pointer",
+          fontSize: 14,
+          fontWeight: 700,
+          padding: "0 4px"
+        },
+        title: "Entfernen"
+      }, "×"));
+    }));
   })()), /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 10
+      padding: "12px 18px 16px"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      fontSize: 11,
+      fontWeight: 700,
+      color: "#6c757d",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Schicht hinzufügen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      marginBottom: 10,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
       fontSize: 10,
       fontWeight: 600,
       color: "#868e96",
-      marginBottom: 3
+      display: "block",
+      marginBottom: 2
     }
-  }, "Aktuell:"), (assignments[editingCell] || []).length === 0 ? /*#__PURE__*/React.createElement("div", {
+  }, "Von"), /*#__PURE__*/React.createElement("select", {
+    value: smFrom,
+    onChange: e => setSmFrom(e.target.value),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 13,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, TIME_SLOTS.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.start,
+    value: s.start
+  }, s.start)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Bis"), /*#__PURE__*/React.createElement("select", {
+    value: smTo,
+    onChange: e => setSmTo(e.target.value),
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 13,
+      fontVariantNumeric: "tabular-nums"
+    }
+  }, TIME_SLOTS.filter(s => s.start > smFrom).map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.start,
+    value: s.start
+  }, s.start)), /*#__PURE__*/React.createElement("option", {
+    value: "20:00"
+  }, "20:00"))), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 11,
-      color: "#ced4da",
-      fontStyle: "italic"
-    }
-  }, "Niemand") : /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 3
-    }
-  }, (assignments[editingCell] || []).map(sid => /*#__PURE__*/React.createElement(Chip, {
-    key: sid,
-    staffId: sid,
-    onRemove: id => removeFromCell(editingCell, id),
-    staffList: staffList
-  })))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
       color: "#868e96",
-      marginBottom: 3
+      marginTop: 14
     }
-  }, "Hinzufügen:"), /*#__PURE__*/React.createElement("div", {
+  }, ((timeToMin(smTo) - timeToMin(smFrom)) / 60).toFixed(1), " Std.")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexWrap: "wrap",
-      gap: 2
+      gap: 4
     }
-  }, staffList.filter(s => !(assignments[editingCell] || []).includes(s.id)).map(s => {
-    const p = editingCell.split("-");
-    const avail = isAvailable(s, parseInt(p[0]), p[3], vacations, wsStr);
+  }, staffList.map(s => {
+    const avail = isAvailable(s, shiftModal.day, "08:00", vacations, wsStr);
+    const alreadyHere = Object.entries(assignments).some(([k, sids]) => {
+      const p = k.split("-");
+      return parseInt(p[0]) === shiftModal.day && p[1] === shiftModal.station && (sids === null || sids === void 0 ? void 0 : sids.includes(s.id));
+    });
     return /*#__PURE__*/React.createElement("button", {
       key: s.id,
-      onClick: () => addToCell(editingCell, s.id),
+      onClick: () => addShiftFromModal(s.id),
       style: {
-        display: "inline-flex",
+        display: "flex",
         alignItems: "center",
-        gap: 2,
-        padding: "2px 6px",
-        borderRadius: 4,
-        border: `1px solid ${avail ? s.color + "44" : "#e9ecef"}`,
-        background: avail ? "#fff" : "#f8f9fa",
-        color: avail ? s.color : "#bbb",
-        fontSize: 10.5,
+        gap: 4,
+        padding: "6px 12px",
+        borderRadius: 6,
+        border: `1.5px solid ${avail ? s.color + "55" : "#e9ecef"}`,
+        background: alreadyHere ? s.color + "10" : "#fff",
+        color: avail ? s.color : "#ccc",
+        fontSize: 12,
         fontWeight: 600,
-        cursor: "pointer"
+        cursor: avail ? "pointer" : "default",
+        opacity: avail ? 1 : 0.4
+      },
+      disabled: !avail
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 7,
+        height: 7,
+        borderRadius: "50%",
+        background: avail ? s.color : "#ccc"
       }
-    }, "+ ", s.name);
+    }), s.name, !avail && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9
+      }
+    }, "⛔"));
   }))))), showShare && /*#__PURE__*/React.createElement(ShareModal, {
     staffList: staffList,
     assignments: assignments,
     weekStart: weekStart,
     onClose: () => setShowShare(false)
-  }));
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "print-only"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontSize: 16,
+      fontWeight: 800,
+      margin: 0
+    }
+  }, "statt-Tipex · Wochenplan"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      color: "#6c757d"
+    }
+  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd)))), DAYS.map((dn, di) => {
+    const ds = getDynSlots(assignments, di);
+    return /*#__PURE__*/React.createElement("div", {
+      key: di,
+      className: "print-day"
+    }, /*#__PURE__*/React.createElement("h3", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        margin: "6px 0 2px",
+        borderBottom: "1px solid #333",
+        paddingBottom: 2
+      }
+    }, dn, " ", (() => {
+      const dt = new Date(weekStart);
+      dt.setDate(dt.getDate() + di);
+      return dt.getDate() + ".";
+    })()), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+      style: {
+        width: 36,
+        textAlign: "left"
+      }
+    }, "Zeit"), STATIONS.map(st => /*#__PURE__*/React.createElement("th", {
+      key: st.id,
+      colSpan: ds[st.id] || 1,
+      style: {
+        textAlign: "center"
+      }
+    }, st.label)))), /*#__PURE__*/React.createElement("tbody", null, TIME_SLOTS.map(slot => {
+      const hasAny = STATIONS.some(st => {
+        for (let idx = 0; idx < (ds[st.id] || 1); idx++) {
+          var _assignments;
+          if ((_assignments = assignments[`${di}-${st.id}-${idx}-${slot.start}`]) !== null && _assignments !== void 0 && _assignments.length) return true;
+        }
+        return false;
+      });
+      if (!hasAny) return null;
+      return /*#__PURE__*/React.createElement("tr", {
+        key: slot.start
+      }, /*#__PURE__*/React.createElement("td", {
+        style: {
+          fontSize: 7,
+          color: "#666",
+          whiteSpace: "nowrap"
+        }
+      }, slot.start), STATIONS.flatMap(st => Array.from({
+        length: ds[st.id] || 1
+      }, (_, idx) => {
+        const assigned = assignments[`${di}-${st.id}-${idx}-${slot.start}`] || [];
+        return /*#__PURE__*/React.createElement("td", {
+          key: `${st.id}-${idx}`,
+          style: {
+            borderLeft: idx === 0 ? "0.5px solid #ccc" : "0.5px solid #eee"
+          }
+        }, assigned.map(sid => {
+          const s = staffList.find(x => x.id === sid);
+          return s ? /*#__PURE__*/React.createElement("span", {
+            key: sid,
+            className: "print-chip",
+            style: {
+              display: "inline-block",
+              background: s.color + "20",
+              color: s.color,
+              border: `1px solid ${s.color}66`,
+              borderRadius: 3,
+              padding: "0px 3px",
+              fontSize: 7,
+              fontWeight: 600,
+              whiteSpace: "nowrap"
+            }
+          }, s.name) : null;
+        }));
+      })));
+    }))));
+  })));
 }
 ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(Schichtplaner));
 </script>
