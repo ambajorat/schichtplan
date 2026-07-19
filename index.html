@@ -914,7 +914,24 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         }
       }
 
-      // Then: assign all other roles (regardless of whether doctor was found)
+      // Then: assign other roles - but ONLY if doctor is present (for rooms that require one)
+      var hasArztAssigned = false;
+      if (hasArztReq) {
+        Object.keys(personBusy).forEach(function (sid) {
+          if (dayAvail[sid] && dayAvail[sid].roles.indexOf("arzt") >= 0) {
+            // Check if this doctor is assigned to THIS station
+            var found = false;
+            for (var si = 0; si < 10; si++) {
+              var k = di + "-" + sc.id + "-" + si + "-" + dayAvail[sid].from;
+              if (plan[k] && plan[k].indexOf(sid) >= 0) found = true;
+            }
+            if (found) hasArztAssigned = true;
+          }
+        });
+        if (!hasArztAssigned) return; // No doctor at this station -> skip other roles
+      }
+
+      // Assign non-arzt roles
       sc.reqs.forEach(function (req) {
         if (req.role === "arzt" || req.min <= 0) return;
         var filled = 0;
@@ -4306,7 +4323,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.6"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.7"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
