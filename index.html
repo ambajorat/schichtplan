@@ -793,13 +793,11 @@ function findFreeSlot(assignments, day, station, from, to) {
 
 // Auto-scheduler: generate a week plan based on station requirements and staff availability
 function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
-  const plan = {};
-  const weekHours = {};
+  var plan = {};
+  var weekHours = {};
   staffList.forEach(function (s) {
     weekHours[s.id] = 0;
   });
-
-  // Priority order: empfang first, then zi1-4, then rest
   var priority = {
     "empfang": 0,
     "zi1": 1,
@@ -815,15 +813,17 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
   var sortedConfig = [].concat(stationConfig).sort(function (a, b) {
     return (priority[a.id] || 99) - (priority[b.id] || 99);
   });
-  const doctorStations = ["zi1", "zi2", "zi3", "zi4"];
+
+  // For each day, assign whole shifts (not individual slots)
   DAYS.forEach(function (_, di) {
-    const dayAvail = {};
+    // Build availability for this day
+    var dayAvail = {};
     staffList.forEach(function (s) {
-      const av = s.availability ? s.availability[di] : null;
+      var av = s.availability ? s.availability[di] : null;
       if (!av) return;
-      const dt = new Date(weekStartStr + "T00:00:00");
+      var dt = new Date(weekStartStr + "T00:00:00");
       dt.setDate(dt.getDate() + di);
-      const ds = dt.toISOString().slice(0, 10);
+      var ds = dt.toISOString().slice(0, 10);
       var onLeave = false;
       vacations.forEach(function (v) {
         if (v.staffId === s.id && ds >= v.from && ds <= v.to) onLeave = true;
@@ -839,128 +839,118 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         roles: getRoles(s)
       };
     });
-    TIME_SLOTS.forEach(function (slot) {
-      const t = timeToMin(slot.start);
 
-      // Two-pass: first assign doctors, then other roles only where a doctor is present
-      // Pass 1: Arzt requirements
-      sortedConfig.forEach(function (sc) {
-        if (!sc.reqs || sc.reqs.length === 0) return;
-        sc.reqs.forEach(function (req) {
-          if (req.role !== "arzt" || req.min <= 0) return;
-          var filled = 0;
-          for (var si = 0; si < 10; si++) {
-            var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
-            if (plan[k] && plan[k].length > 0) {
-              var aid = plan[k][0];
-              if (dayAvail[aid] && dayAvail[aid].roles.indexOf("arzt") >= 0) filled++;
-            }
-          }
-          if (filled >= req.min) return;
-          var candidates = [];
-          Object.keys(dayAvail).forEach(function (sid) {
-            var da = dayAvail[sid];
-            if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
-            if (da.rooms.indexOf(sc.id) < 0) return;
-            if (da.roles.indexOf("arzt") < 0) return;
-            var busy = false;
-            STATIONS.forEach(function (st2) {
-              for (var si2 = 0; si2 < 10; si2++) {
-                var k2 = di + "-" + st2.id + "-" + si2 + "-" + slot.start;
-                if (plan[k2] && plan[k2].indexOf(sid) >= 0) busy = true;
-              }
-            });
-            if (busy) return;
-            if (weekHours[sid] >= da.maxH) return;
-            candidates.push({
-              id: sid,
-              hours: weekHours[sid]
-            });
-          });
-          candidates.sort(function (a, b) {
-            return a.hours - b.hours;
-          });
-          for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
-            var slot2 = 0;
-            for (var si3 = 0; si3 < 10; si3++) {
-              var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
-              if (!plan[k3] || plan[k3].length === 0) {
-                slot2 = si3;
-                break;
-              }
-            }
-            plan[di + "-" + sc.id + "-" + slot2 + "-" + slot.start] = [candidates[ci].id];
-            weekHours[candidates[ci].id] += 0.5;
-            filled++;
-          }
-        });
-      });
+    // Track who is assigned where on this day (person -> station)
+    var dayAssigned = {};
 
-      // Pass 2: non-Arzt roles, but only at stations that have a doctor (or don't require one)
-      sortedConfig.forEach(function (sc) {
-        if (!sc.reqs || sc.reqs.length === 0) return;
-        var needsDoctor = sc.reqs.some(function (r) {
-          return r.role === "arzt" && r.min > 0;
+    // Pass 1: Arzt requirements (whole shifts)
+    sortedConfig.forEach(function (sc) {
+      if (!sc.reqs) return;
+      sc.reqs.forEach(function (req) {
+        if (req.role !== "arzt" || req.min <= 0) return;
+        // Find available doctors for this station
+        var candidates = [];
+        Object.keys(dayAvail).forEach(function (sid) {
+          var da = dayAvail[sid];
+          if (da.rooms.indexOf(sc.id) < 0) return;
+          if (da.roles.indexOf("arzt") < 0) return;
+          if (dayAssigned[sid]) return; // already assigned today
+          if (weekHours[sid] >= da.maxH) return;
+          candidates.push({
+            id: sid,
+            from: da.from,
+            to: da.to,
+            hours: weekHours[sid]
+          });
         });
-        if (needsDoctor) {
-          var hasDoctor = false;
+        candidates.sort(function (a, b) {
+          return a.hours - b.hours;
+        });
+        for (var ci = 0; ci < candidates.length && ci < req.min; ci++) {
+          var c = candidates[ci];
+          var slot = 0;
+          // Find free slot index for this station
           for (var si = 0; si < 10; si++) {
-            var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
-            if (plan[k] && plan[k].length > 0) {
-              var aid = plan[k][0];
-              if (dayAvail[aid] && dayAvail[aid].roles.indexOf("arzt") >= 0) hasDoctor = true;
+            var testKey = di + "-" + sc.id + "-" + si + "-" + c.from;
+            if (!plan[testKey] || plan[testKey].length === 0) {
+              slot = si;
+              break;
             }
           }
-          if (!hasDoctor) return; // skip non-doctor roles if no doctor present
+          // Assign for full availability window
+          TIME_SLOTS.forEach(function (ts) {
+            var t = timeToMin(ts.start);
+            if (t >= timeToMin(c.from) && t < timeToMin(c.to)) {
+              plan[di + "-" + sc.id + "-" + slot + "-" + ts.start] = [c.id];
+            }
+          });
+          var shiftHours = (timeToMin(c.to) - timeToMin(c.from)) / 60;
+          weekHours[c.id] += shiftHours;
+          dayAssigned[c.id] = sc.id;
         }
-        sc.reqs.forEach(function (req) {
-          if (req.role === "arzt" || req.min <= 0) return; // already handled
-          var filled = 0;
-          for (var si = 0; si < 10; si++) {
-            var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
-            if (plan[k] && plan[k].length > 0) {
-              var aid = plan[k][0];
-              if (dayAvail[aid] && dayAvail[aid].roles.indexOf(req.role) >= 0) filled++;
-            }
-          }
-          if (filled >= req.min) return;
-          var candidates = [];
-          Object.keys(dayAvail).forEach(function (sid) {
-            var da = dayAvail[sid];
-            if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
-            if (da.rooms.indexOf(sc.id) < 0) return;
-            if (da.roles.indexOf(req.role) < 0) return;
-            var busy = false;
-            STATIONS.forEach(function (st2) {
-              for (var si2 = 0; si2 < 10; si2++) {
-                var k2 = di + "-" + st2.id + "-" + si2 + "-" + slot.start;
-                if (plan[k2] && plan[k2].indexOf(sid) >= 0) busy = true;
-              }
-            });
-            if (busy) return;
-            if (weekHours[sid] >= da.maxH) return;
-            candidates.push({
-              id: sid,
-              hours: weekHours[sid]
-            });
-          });
-          candidates.sort(function (a, b) {
-            return a.hours - b.hours;
-          });
-          for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
-            var slot2 = 0;
-            for (var si3 = 0; si3 < 10; si3++) {
-              var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
-              if (!plan[k3] || plan[k3].length === 0) {
-                slot2 = si3;
-                break;
-              }
-            }
-            plan[di + "-" + sc.id + "-" + slot2 + "-" + slot.start] = [candidates[ci].id];
-            weekHours[candidates[ci].id] += 0.5;
-            filled++;
-          }
+      });
+    });
+
+    // Pass 2: non-Arzt roles (whole shifts), only where doctor present if required
+    sortedConfig.forEach(function (sc) {
+      if (!sc.reqs) return;
+      var needsDoctor = sc.reqs.some(function (r) {
+        return r.role === "arzt" && r.min > 0;
+      });
+      if (needsDoctor) {
+        // Check if a doctor was assigned to this station
+        var hasDoc = false;
+        Object.keys(dayAssigned).forEach(function (sid) {
+          if (dayAssigned[sid] === sc.id && dayAvail[sid] && dayAvail[sid].roles.indexOf("arzt") >= 0) hasDoc = true;
         });
+        if (!hasDoc) return;
+      }
+      sc.reqs.forEach(function (req) {
+        if (req.role === "arzt" || req.min <= 0) return;
+        var filled = 0;
+        // Count already assigned with this role at this station
+        Object.keys(dayAssigned).forEach(function (sid) {
+          if (dayAssigned[sid] === sc.id && dayAvail[sid] && dayAvail[sid].roles.indexOf(req.role) >= 0) filled++;
+        });
+        if (filled >= req.min) return;
+        var candidates = [];
+        Object.keys(dayAvail).forEach(function (sid) {
+          var da = dayAvail[sid];
+          if (da.rooms.indexOf(sc.id) < 0) return;
+          if (da.roles.indexOf(req.role) < 0) return;
+          if (dayAssigned[sid]) return;
+          if (weekHours[sid] >= da.maxH) return;
+          candidates.push({
+            id: sid,
+            from: da.from,
+            to: da.to,
+            hours: weekHours[sid]
+          });
+        });
+        candidates.sort(function (a, b) {
+          return a.hours - b.hours;
+        });
+        for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
+          var c = candidates[ci];
+          var slot = 0;
+          for (var si = 0; si < 10; si++) {
+            var testKey = di + "-" + sc.id + "-" + si + "-" + c.from;
+            if (!plan[testKey] || plan[testKey].length === 0) {
+              slot = si;
+              break;
+            }
+          }
+          TIME_SLOTS.forEach(function (ts) {
+            var t = timeToMin(ts.start);
+            if (t >= timeToMin(c.from) && t < timeToMin(c.to)) {
+              plan[di + "-" + sc.id + "-" + slot + "-" + ts.start] = [c.id];
+            }
+          });
+          var shiftHours = (timeToMin(c.to) - timeToMin(c.from)) / 60;
+          weekHours[c.id] += shiftHours;
+          dayAssigned[c.id] = sc.id;
+          filled++;
+        }
       });
     });
   });
@@ -4328,7 +4318,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.3"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.4"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
