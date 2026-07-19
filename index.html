@@ -1118,9 +1118,12 @@ function buildTeamLink(assignments, staffList, weekStart) {
 function ReadOnlyTeamView({
   data
 }) {
-  const DE = ["Mo", "Di", "Mi", "Do", "Fr"];
-  const dayData = {};
-  DAYS.forEach((_, di) => dayData[di] = {});
+  var dayColors = ["#e3f2fd", "#fff3e0", "#e8f5e9", "#fce4ec", "#f3e5f5"];
+  var dayAccent = ["#1565c0", "#e65100", "#2e7d32", "#c62828", "#6a1b9a"];
+  var dayData = {};
+  DAYS.forEach(function (_, di) {
+    dayData[di] = {};
+  });
   (data.d || "").split(";").filter(Boolean).forEach(function (entry) {
     var parts = entry.split("~");
     var name = parts[0],
@@ -1152,34 +1155,44 @@ function ReadOnlyTeamView({
   });
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "system-ui,sans-serif",
+      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
       maxWidth: 600,
       margin: "0 auto",
-      padding: 16,
+      padding: 20,
       color: "#212529",
-      minHeight: "100vh"
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #f8f9fa 0%, #fff 200px)"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      marginBottom: 16
+      marginBottom: 24
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "#868e96",
-      marginBottom: 4
+      display: "inline-block",
+      padding: "6px 16px",
+      borderRadius: 20,
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 10
     }
-  }, "Schichtplan"), /*#__PURE__*/React.createElement("h1", {
+  }, "statt-Tipex"), /*#__PURE__*/React.createElement("h1", {
     style: {
-      fontSize: 20,
+      fontSize: 24,
       fontWeight: 800,
-      margin: "0 0 2px"
+      margin: "0 0 4px",
+      letterSpacing: -0.5
     }
-  }, "Gesamtplan"), /*#__PURE__*/React.createElement("div", {
+  }, "Wochenplan"), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      color: "#6c757d"
+      fontSize: 14,
+      color: "#6c757d",
+      fontWeight: 500
     }
   }, data.w)), DAYS.map(function (dn, di) {
     var stations = dayData[di] || {};
@@ -1190,36 +1203,40 @@ function ReadOnlyTeamView({
     return /*#__PURE__*/React.createElement("div", {
       key: di,
       style: {
-        marginBottom: 14,
-        borderRadius: 10,
-        border: "1px solid #e9ecef",
-        overflow: "hidden"
+        marginBottom: 12,
+        borderRadius: 14,
+        overflow: "hidden",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        padding: "8px 14px",
-        background: "#f5f6f7",
+        padding: "10px 16px",
+        background: dayColors[di],
         fontWeight: 700,
-        fontSize: 14
+        fontSize: 15,
+        color: dayAccent[di],
+        borderBottom: "2px solid " + dayAccent[di] + "33"
       }
-    }, DE[di] + " " + dn), /*#__PURE__*/React.createElement("div", {
+    }, dn), /*#__PURE__*/React.createElement("div", {
       style: {
-        padding: "4px 0"
+        padding: "6px 0",
+        background: "#fff"
       }
-    }, stKeys.map(function (station) {
+    }, stKeys.map(function (station, sti) {
       return /*#__PURE__*/React.createElement("div", {
         key: station,
         style: {
-          padding: "4px 14px"
+          padding: "6px 16px",
+          borderBottom: sti < stKeys.length - 1 ? "1px solid #f1f3f5" : "none"
         }
       }, /*#__PURE__*/React.createElement("div", {
         style: {
           fontSize: 10,
           fontWeight: 700,
-          color: "#868e96",
+          color: "#adb5bd",
           textTransform: "uppercase",
-          letterSpacing: 0.5,
-          marginBottom: 2
+          letterSpacing: 0.8,
+          marginBottom: 4
         }
       }, station), stations[station].map(function (e, ei) {
         return /*#__PURE__*/React.createElement("div", {
@@ -1228,22 +1245,23 @@ function ReadOnlyTeamView({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "4px 0",
-            borderBottom: ei < stations[station].length - 1 ? "1px solid #f5f5f5" : "none"
+            padding: "5px 0"
           }
         }, /*#__PURE__*/React.createElement("span", {
           style: {
-            fontSize: 13,
-            fontWeight: 600
+            fontSize: 14,
+            fontWeight: 600,
+            color: "#212529"
           }
         }, e.name), /*#__PURE__*/React.createElement("span", {
           style: {
             fontSize: 12,
-            color: "#495057",
+            color: dayAccent[di],
+            fontWeight: 600,
             fontVariantNumeric: "tabular-nums",
-            background: "#f0f7ff",
-            padding: "2px 8px",
-            borderRadius: 5
+            background: dayColors[di],
+            padding: "3px 10px",
+            borderRadius: 6
           }
         }, e.from + " - " + e.to));
       }));
@@ -1251,82 +1269,121 @@ function ReadOnlyTeamView({
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      marginTop: 20,
-      fontSize: 11,
-      color: "#ced4da"
+      marginTop: 24,
+      padding: "12px 0"
     }
-  }, "statt-Tipex"));
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#ced4da",
+      letterSpacing: 0.5
+    }
+  }, "statt-Tipex v1.0")));
 }
 function ReadOnlyView({
   data
 }) {
-  var DE = ["Mo", "Di", "Mi", "Do", "Fr"];
+  var dayColors = ["#e3f2fd", "#fff3e0", "#e8f5e9", "#fce4ec", "#f3e5f5"];
+  var dayAccent = ["#1565c0", "#e65100", "#2e7d32", "#c62828", "#6a1b9a"];
+  // Calculate total hours from shifts
+  var totalSlots = 0;
+  (data.s || []).forEach(function (dayStr) {
+    if (!dayStr) return;
+    dayStr.split(",").filter(Boolean).forEach(function (sh) {
+      var pipeIdx = sh.indexOf("|");
+      var tr = pipeIdx >= 0 ? sh.substring(pipeIdx + 1) : "";
+      var di = tr.indexOf("-");
+      var f = di >= 0 ? tr.substring(0, di) : "";
+      var t = di >= 0 ? tr.substring(di + 1) : "";
+      if (f && t) totalSlots += (timeToMin(t) - timeToMin(f)) / 30;
+    });
+  });
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: "system-ui,sans-serif",
+      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
       maxWidth: 480,
       margin: "0 auto",
       padding: 20,
       color: "#212529",
-      minHeight: "100vh"
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #f0f7ff 0%, #fff 200px)"
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      marginBottom: 20
+      marginBottom: 24
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 12,
-      color: "#868e96",
-      marginBottom: 4
+      display: "inline-block",
+      padding: "6px 16px",
+      borderRadius: 20,
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 10
     }
-  }, "Schichtplan"), /*#__PURE__*/React.createElement("h1", {
+  }, "statt-Tipex"), /*#__PURE__*/React.createElement("h1", {
     style: {
-      fontSize: 22,
+      fontSize: 28,
       fontWeight: 800,
-      margin: "0 0 4px"
+      margin: "0 0 4px",
+      letterSpacing: -0.5
     }
   }, data.n), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      color: "#6c757d"
+      fontSize: 14,
+      color: "#6c757d",
+      fontWeight: 500
     }
   }, data.w), /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 13,
-      color: "#495057",
-      fontWeight: 600,
-      marginTop: 4
+      display: "inline-block",
+      marginTop: 8,
+      padding: "6px 20px",
+      borderRadius: 20,
+      background: "#e3f2fd",
+      color: "#1565c0",
+      fontSize: 14,
+      fontWeight: 700
     }
-  }, data.h + " Stunden")), DAYS.map(function (dn, di) {
-    var shifts = data.s[di] ? data.s[di].split(",").filter(Boolean) : [];
+  }, data.h + " Std.")), DAYS.map(function (dn, di) {
+    var shifts = data.s && data.s[di] ? data.s[di].split(",").filter(Boolean) : [];
     return /*#__PURE__*/React.createElement("div", {
       key: di,
       style: {
         marginBottom: 10,
-        borderRadius: 10,
-        border: "1px solid #e9ecef",
-        overflow: "hidden"
+        borderRadius: 14,
+        overflow: "hidden",
+        boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
-        padding: "8px 14px",
-        background: "#f8f9fa",
+        padding: "10px 16px",
+        background: dayColors[di],
         fontWeight: 700,
-        fontSize: 13
+        fontSize: 15,
+        color: dayAccent[di],
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        borderBottom: "2px solid " + dayAccent[di] + "33"
       }
-    }, DE[di] + " " + dn), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("span", null, dn), shifts.length === 0 && /*#__PURE__*/React.createElement("span", {
       style: {
-        padding: "8px 14px"
+        fontSize: 11,
+        fontWeight: 500,
+        opacity: 0.6
       }
-    }, shifts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    }, "frei")), shifts.length > 0 && /*#__PURE__*/React.createElement("div", {
       style: {
-        color: "#ced4da",
-        fontSize: 13,
-        fontStyle: "italic"
+        padding: "8px 16px",
+        background: "#fff"
       }
-    }, "Frei") : shifts.map(function (sh, si) {
+    }, shifts.map(function (sh, si) {
       var pipeIdx = sh.indexOf("|");
       var station = pipeIdx >= 0 ? sh.substring(0, pipeIdx) : sh;
       var timeRange = pipeIdx >= 0 ? sh.substring(pipeIdx + 1) : "";
@@ -1339,34 +1396,40 @@ function ReadOnlyView({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "6px 0",
+          padding: "8px 0",
           borderBottom: si < shifts.length - 1 ? "1px solid #f1f3f5" : "none"
         }
-      }, /*#__PURE__*/React.createElement("span", {
+      }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
         style: {
-          fontSize: 14,
-          fontWeight: 600,
+          fontSize: 15,
+          fontWeight: 700,
           color: "#212529"
         }
-      }, station), /*#__PURE__*/React.createElement("span", {
+      }, station)), /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 13,
-          color: "#495057",
+          color: dayAccent[di],
+          fontWeight: 600,
           fontVariantNumeric: "tabular-nums",
-          background: "#f0f7ff",
-          padding: "2px 8px",
-          borderRadius: 5
+          background: dayColors[di],
+          padding: "4px 12px",
+          borderRadius: 8
         }
       }, from + " - " + to));
     })));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
-      marginTop: 20,
-      fontSize: 11,
-      color: "#ced4da"
+      marginTop: 24,
+      padding: "12px 0"
     }
-  }, "statt-Tipex"));
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#ced4da",
+      letterSpacing: 0.5
+    }
+  }, "statt-Tipex v1.0")));
 }
 function Chip({
   staffId,
@@ -3715,7 +3778,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.0.1"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.1"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
