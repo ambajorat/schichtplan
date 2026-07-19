@@ -1686,11 +1686,6 @@ function MobileStationView({
   vacations,
   wsStr
 }) {
-  var stL = {};
-  STATIONS.forEach(function (st) {
-    stL[st.id] = st.label;
-  });
-  // For each station, collect all people with their time ranges
   var stationData = [];
   STATIONS.forEach(function (st) {
     var people = {};
@@ -1732,7 +1727,8 @@ function MobileStationView({
       });
       if (s) entries.push({
         staff: s,
-        ranges: ranges
+        ranges: ranges,
+        sid: sid
       });
     });
     entries.sort(function (a, b) {
@@ -1751,35 +1747,19 @@ function MobileStationView({
       gap: 8
     }
   }, stationData.map(function (sd, si) {
-    if (sd.entries.length === 0) return /*#__PURE__*/React.createElement("div", {
-      key: sd.station.id,
-      style: {
-        padding: "10px 14px",
-        borderRadius: 10,
-        background: "#f8f9fa",
-        border: "1px solid #e9ecef",
-        opacity: 0.5
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 12,
-        fontWeight: 700,
-        color: "#868e96"
-      }
-    }, sd.station.label), /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 11,
-        color: "#ced4da",
-        fontStyle: "italic"
-      }
-    }, "nicht besetzt"));
+    var firstTime = sd.entries.length > 0 && sd.entries[0].ranges[0] ? sd.entries[0].ranges[0].from : "08:00";
     return /*#__PURE__*/React.createElement("div", {
       key: sd.station.id,
+      onClick: function () {
+        onCellClick(day + "-" + sd.station.id + "-0-" + firstTime);
+      },
       style: {
         borderRadius: 10,
         overflow: "hidden",
-        border: "1px solid #dee2e6",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
+        border: sd.entries.length > 0 ? "1px solid #dee2e6" : "1px solid #e9ecef",
+        boxShadow: sd.entries.length > 0 ? "0 1px 4px rgba(0,0,0,0.05)" : "none",
+        cursor: "pointer",
+        opacity: sd.entries.length > 0 ? 1 : 0.6
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1788,9 +1768,29 @@ function MobileStationView({
         fontWeight: 700,
         fontSize: 13,
         color: "#212529",
-        borderBottom: "1px solid #dee2e6"
+        borderBottom: "1px solid #dee2e6",
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center"
       }
-    }, sd.station.label), /*#__PURE__*/React.createElement("div", {
+    }, /*#__PURE__*/React.createElement("span", null, sd.station.label), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#4A90D9",
+        fontWeight: 600
+      }
+    }, "bearbeiten >")), sd.entries.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "10px 14px",
+        background: "#f8f9fa"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#ced4da",
+        fontStyle: "italic"
+      }
+    }, "nicht besetzt")) : /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "4px 10px",
         background: "#fff"
@@ -4328,7 +4328,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.2"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.3"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
