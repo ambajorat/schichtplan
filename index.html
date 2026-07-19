@@ -893,7 +893,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
       candidates.sort(function (a, b) {
         return weekHours[a.id] - weekHours[b.id];
       });
-      // Greedily fill the time range
+      // Track which slots need covering
       var covered = {};
       TIME_SLOTS.forEach(function (ts) {
         var t = timeToMin(ts.start);
@@ -904,21 +904,26 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         var c = candidates[ci];
         var period = getFreePeriod(c, fromT, toT);
         if (!period) continue;
-        // Check if this candidate covers any uncovered slot
-        var coversNew = false;
+        // Find the UNCOVERED portion within this candidate's period
+        var gapFrom = null,
+          gapTo = null;
         TIME_SLOTS.forEach(function (ts) {
           var t = timeToMin(ts.start);
-          if (t >= timeToMin(period.from) && t < timeToMin(period.to) && covered[ts.start] === false) coversNew = true;
+          if (t >= timeToMin(period.from) && t < timeToMin(period.to) && covered[ts.start] === false) {
+            if (!gapFrom) gapFrom = ts.start;
+            gapTo = ts.start;
+          }
         });
-        if (!coversNew) continue;
-        assignBlock(di, stationId, c.id, period.from, period.to);
-        markBusy(c.id, period.from, period.to);
+        if (!gapFrom) continue;
+        var assignFrom = gapFrom;
+        var assignTo = addEnd(gapTo);
+        assignBlock(di, stationId, c.id, assignFrom, assignTo);
+        markBusy(c.id, assignFrom, assignTo);
         assigned.push(c);
         TIME_SLOTS.forEach(function (ts) {
           var t = timeToMin(ts.start);
-          if (t >= timeToMin(period.from) && t < timeToMin(period.to)) covered[ts.start] = true;
+          if (t >= timeToMin(assignFrom) && t < timeToMin(assignTo)) covered[ts.start] = true;
         });
-        // Check if fully covered
         var allCovered = true;
         Object.keys(covered).forEach(function (k) {
           if (!covered[k]) allCovered = false;
@@ -4403,7 +4408,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v2.6"))), /*#__PURE__*/React.createElement("div", {
+  }, "v2.7"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
