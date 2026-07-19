@@ -107,6 +107,17 @@ function saveData(k, v) {
     localStorage.setItem(k, JSON.stringify(v));
   } catch (e) {}
 }
+function hasRole(staff, r) {
+  var roles = staff.roles || staff.role;
+  if (Array.isArray(roles)) return roles.indexOf(r) >= 0;
+  return roles === r;
+}
+function getRoles(staff) {
+  var roles = staff.roles || staff.role;
+  if (Array.isArray(roles)) return roles;
+  if (roles && roles !== "zfa") return [roles];
+  return ["zfa"];
+}
 const DEFAULT_STAFF = [{
   id: "martina",
   name: "Martina",
@@ -789,136 +800,66 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
           return x.id;
         }),
         maxH: s.maxHours || 40,
-        role: s.role || "mfa"
+        roles: getRoles(s)
       };
     });
     TIME_SLOTS.forEach(function (slot) {
       const t = timeToMin(slot.start);
 
-      // First pass: assign min staff per station
+      // For each station, fill role-based requirements
       stationConfig.forEach(function (sc) {
-        var needed = sc.min;
-        if (needed <= 0) return;
-        var filled = 0;
-        for (var si = 0; si < 10; si++) {
-          var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
-          if (plan[k] && plan[k].length > 0) filled++;
-        }
-        if (filled >= needed) return;
-        var candidates = [];
-        Object.keys(dayAvail).forEach(function (sid) {
-          var da = dayAvail[sid];
-          if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
-          if (da.rooms.indexOf(sc.id) < 0) return;
-          var busy = false;
-          STATIONS.forEach(function (st2) {
-            for (var si2 = 0; si2 < 10; si2++) {
-              var k2 = di + "-" + st2.id + "-" + si2 + "-" + slot.start;
-              if (plan[k2] && plan[k2].indexOf(sid) >= 0) busy = true;
-            }
-          });
-          if (busy) return;
-          if (weekHours[sid] >= da.maxH) return;
-          candidates.push({
-            id: sid,
-            hours: weekHours[sid],
-            role: da.role
-          });
-        });
+        if (!sc.reqs || sc.reqs.length === 0) return;
+        sc.reqs.forEach(function (req) {
+          var needed = req.min;
+          if (needed <= 0) return;
 
-        // For Zi 1-4: prioritize doctors if no doctor assigned yet
-        if (doctorStations.indexOf(sc.id) >= 0) {
-          var hasDoctor = false;
-          for (var si4 = 0; si4 < 10; si4++) {
-            var k4 = di + "-" + sc.id + "-" + si4 + "-" + slot.start;
-            if (plan[k4] && plan[k4].length > 0) {
-              var assignedId = plan[k4][0];
-              if (dayAvail[assignedId] && dayAvail[assignedId].role === "arzt") hasDoctor = true;
+          // Count how many of this role already assigned
+          var filled = 0;
+          for (var si = 0; si < 10; si++) {
+            var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
+            if (plan[k] && plan[k].length > 0) {
+              var aid = plan[k][0];
+              if (dayAvail[aid] && dayAvail[aid].roles.indexOf(req.role) >= 0) filled++;
             }
           }
-          if (!hasDoctor) {
-            // Sort doctors first, then by hours
-            candidates.sort(function (a, b) {
-              if (a.role === "arzt" && b.role !== "arzt") return -1;
-              if (a.role !== "arzt" && b.role === "arzt") return 1;
-              return a.hours - b.hours;
-            });
-          } else {
-            candidates.sort(function (a, b) {
-              return a.hours - b.hours;
-            });
-          }
-        } else {
-          candidates.sort(function (a, b) {
-            return a.hours - b.hours;
-          });
-        }
-        for (var ci = 0; ci < candidates.length && filled < needed; ci++) {
-          var slot2 = 0;
-          for (var si3 = 0; si3 < 10; si3++) {
-            var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
-            if (!plan[k3] || plan[k3].length === 0) {
-              slot2 = si3;
-              break;
-            }
-          }
-          var key = di + "-" + sc.id + "-" + slot2 + "-" + slot.start;
-          plan[key] = [candidates[ci].id];
-          weekHours[candidates[ci].id] += 0.5;
-          filled++;
-        }
-      });
-
-      // Second pass: ensure Zi 1-4 have a doctor if any staff is there
-      doctorStations.forEach(function (stId) {
-        var hasStaff = false,
-          hasDoctor = false;
-        for (var si5 = 0; si5 < 10; si5++) {
-          var k5 = di + "-" + stId + "-" + si5 + "-" + slot.start;
-          if (plan[k5] && plan[k5].length > 0) {
-            hasStaff = true;
-            var aid = plan[k5][0];
-            if (dayAvail[aid] && dayAvail[aid].role === "arzt") hasDoctor = true;
-          }
-        }
-        if (hasStaff && !hasDoctor) {
-          // Try to add a doctor
-          var docCandidates = [];
+          if (filled >= needed) return;
+          var candidates = [];
           Object.keys(dayAvail).forEach(function (sid) {
             var da = dayAvail[sid];
-            if (da.role !== "arzt") return;
             if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
-            if (da.rooms.indexOf(stId) < 0) return;
+            if (da.rooms.indexOf(sc.id) < 0) return;
+            if (da.roles.indexOf(req.role) < 0) return;
             var busy = false;
             STATIONS.forEach(function (st2) {
-              for (var si6 = 0; si6 < 10; si6++) {
-                var k6 = di + "-" + st2.id + "-" + si6 + "-" + slot.start;
-                if (plan[k6] && plan[k6].indexOf(sid) >= 0) busy = true;
+              for (var si2 = 0; si2 < 10; si2++) {
+                var k2 = di + "-" + st2.id + "-" + si2 + "-" + slot.start;
+                if (plan[k2] && plan[k2].indexOf(sid) >= 0) busy = true;
               }
             });
             if (busy) return;
             if (weekHours[sid] >= da.maxH) return;
-            docCandidates.push({
+            candidates.push({
               id: sid,
               hours: weekHours[sid]
             });
           });
-          docCandidates.sort(function (a, b) {
+          candidates.sort(function (a, b) {
             return a.hours - b.hours;
           });
-          if (docCandidates.length > 0) {
-            var dSlot = 0;
-            for (var si7 = 0; si7 < 10; si7++) {
-              var k7 = di + "-" + stId + "-" + si7 + "-" + slot.start;
-              if (!plan[k7] || plan[k7].length === 0) {
-                dSlot = si7;
+          for (var ci = 0; ci < candidates.length && filled < needed; ci++) {
+            var slot2 = 0;
+            for (var si3 = 0; si3 < 10; si3++) {
+              var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
+              if (!plan[k3] || plan[k3].length === 0) {
+                slot2 = si3;
                 break;
               }
             }
-            plan[di + "-" + stId + "-" + dSlot + "-" + slot.start] = [docCandidates[0].id];
-            weekHours[docCandidates[0].id] += 0.5;
+            plan[di + "-" + sc.id + "-" + slot2 + "-" + slot.start] = [candidates[ci].id];
+            weekHours[candidates[ci].id] += 0.5;
+            filled++;
           }
-        }
+        });
       });
     });
   });
@@ -1349,7 +1290,7 @@ function Chip({
       whiteSpace: "nowrap",
       lineHeight: 1.4
     }
-  }, s.role === "arzt" && /*#__PURE__*/React.createElement("span", {
+  }, hasRole(s, "arzt") && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: small ? 7 : 8,
       fontWeight: 800,
@@ -1613,7 +1554,7 @@ function AvailabilityEditor({
   const [av, setAv] = useState(JSON.parse(JSON.stringify(staff.availability || {})));
   const [maxH, setMaxH] = useState(staff.maxHours || 40);
   const [vDays, setVDays] = useState((_staff$vacDays = staff.vacDays) !== null && _staff$vacDays !== void 0 ? _staff$vacDays : 26);
-  const [role, setRole] = useState(staff.role || "mfa");
+  const [roles, setRoles] = useState(getRoles(staff));
   const [rooms, setRooms] = useState(staff.rooms || STATIONS.map(function (s) {
     return s.id;
   }));
@@ -1683,26 +1624,35 @@ function AvailabilityEditor({
       color: "#6c757d",
       fontWeight: 600
     }
-  }, "Rolle"), /*#__PURE__*/React.createElement("select", {
-    value: role,
-    onChange: function (e) {
-      setRole(e.target.value);
-    },
+  }, "Rolle"), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "block",
-      padding: "5px 8px",
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 13,
+      display: "flex",
+      gap: 4,
       marginTop: 3
     }
-  }, /*#__PURE__*/React.createElement("option", {
-    value: "mfa"
-  }, "MFA"), /*#__PURE__*/React.createElement("option", {
-    value: "arzt"
-  }, "Arzt / Ärztin"), /*#__PURE__*/React.createElement("option", {
-    value: "azubi"
-  }, "Azubi"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+  }, [["arzt", "Arzt"], ["zfa", "ZFA"], ["znp", "ZNP"], ["zmv", "ZMV"], ["azubi", "Azubi"]].map(function (r) {
+    var active = roles.indexOf(r[0]) >= 0;
+    return /*#__PURE__*/React.createElement("button", {
+      key: r[0],
+      onClick: function () {
+        setRoles(function (prev) {
+          return active ? prev.filter(function (x) {
+            return x !== r[0];
+          }) : prev.concat([r[0]]);
+        });
+      },
+      style: {
+        padding: "4px 10px",
+        borderRadius: 5,
+        border: active ? "2px solid " + staff.color : "1.5px solid #dee2e6",
+        background: active ? staff.color + "15" : "#fff",
+        color: active ? staff.color : "#adb5bd",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, r[1]);
+  }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: 11,
       color: "#6c757d",
@@ -1879,7 +1829,7 @@ function AvailabilityEditor({
       maxHours: maxH,
       vacDays: vDays,
       rooms: rooms,
-      role: role
+      roles: roles
     }),
     style: {
       padding: "7px 18px",
@@ -2634,10 +2584,16 @@ function Schichtplaner() {
   const [smFrom, setSmFrom] = useState("08:00");
   const [smTo, setSmTo] = useState("14:00");
   const [showStationCfg, setShowStationCfg] = useState(false);
-  const [stationMins, setStationMins] = useState(function () {
+  const ROLES = [["arzt", "Arzt"], ["zfa", "ZFA"], ["znp", "ZNP"], ["zmv", "ZMV"], ["azubi", "Azubi"]];
+  const [stationReqs, setStationReqs] = useState(function () {
     var m = {};
     STATIONS.forEach(function (s) {
-      m[s.id] = s.minStaff || 0;
+      m[s.id] = {};
+      m[s.id]["arzt"] = ["zi1", "zi2", "zi3", "zi4"].indexOf(s.id) >= 0 ? 1 : 0;
+      m[s.id]["zfa"] = s.minStaff || 0;
+      m[s.id]["znp"] = 0;
+      m[s.id]["zmv"] = 0;
+      m[s.id]["azubi"] = 0;
     });
     return m;
   });
@@ -3031,50 +2987,78 @@ function Schichtplaner() {
       textTransform: "uppercase",
       letterSpacing: 0.5
     }
-  }, "Mindestbesetzung pro Station"), /*#__PURE__*/React.createElement("div", {
+  }, "Mindestbesetzung pro Station und Rolle"), /*#__PURE__*/React.createElement("div", {
     style: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 8,
+      overflowX: "auto",
       marginBottom: 10
     }
-  }, STATIONS.map(function (st) {
-    return /*#__PURE__*/React.createElement("div", {
-      key: st.id,
+  }, /*#__PURE__*/React.createElement("table", {
+    style: {
+      borderCollapse: "collapse",
+      fontSize: 11
+    }
+  }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    style: {
+      padding: "4px 8px",
+      textAlign: "left",
+      fontWeight: 600,
+      color: "#6c757d",
+      borderBottom: "2px solid #dee2e6"
+    }
+  }, "Station"), ROLES.map(function (r) {
+    return /*#__PURE__*/React.createElement("th", {
+      key: r[0],
       style: {
-        display: "flex",
-        alignItems: "center",
-        gap: 4
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 11,
+        padding: "4px 8px",
+        textAlign: "center",
         fontWeight: 600,
-        color: "#495057",
+        color: "#6c757d",
+        borderBottom: "2px solid #dee2e6",
         minWidth: 50
       }
-    }, st.label), /*#__PURE__*/React.createElement("input", {
-      type: "number",
-      min: "0",
-      max: "5",
-      value: stationMins[st.id] || 0,
-      onChange: function (e) {
-        setStationMins(function (prev) {
-          var n = Object.assign({}, prev);
-          n[st.id] = parseInt(e.target.value) || 0;
-          return n;
-        });
-      },
+    }, r[1]);
+  }))), /*#__PURE__*/React.createElement("tbody", null, STATIONS.map(function (st) {
+    return /*#__PURE__*/React.createElement("tr", {
+      key: st.id
+    }, /*#__PURE__*/React.createElement("td", {
       style: {
-        width: 42,
-        padding: "3px 6px",
-        border: "1px solid #dee2e6",
-        borderRadius: 4,
-        fontSize: 12,
-        textAlign: "center"
+        padding: "3px 8px",
+        fontWeight: 600,
+        color: "#495057",
+        borderBottom: "1px solid #f1f3f5"
       }
+    }, st.label), ROLES.map(function (r) {
+      return /*#__PURE__*/React.createElement("td", {
+        key: r[0],
+        style: {
+          padding: "3px 4px",
+          textAlign: "center",
+          borderBottom: "1px solid #f1f3f5"
+        }
+      }, /*#__PURE__*/React.createElement("input", {
+        type: "number",
+        min: "0",
+        max: "5",
+        value: stationReqs[st.id] && stationReqs[st.id][r[0]] || 0,
+        onChange: function (e) {
+          setStationReqs(function (prev) {
+            var n = JSON.parse(JSON.stringify(prev));
+            if (!n[st.id]) n[st.id] = {};
+            n[st.id][r[0]] = parseInt(e.target.value) || 0;
+            return n;
+          });
+        },
+        style: {
+          width: 36,
+          padding: "2px 4px",
+          border: "1px solid #dee2e6",
+          borderRadius: 3,
+          fontSize: 11,
+          textAlign: "center"
+        }
+      }));
     }));
-  })), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -3083,9 +3067,17 @@ function Schichtplaner() {
   }, /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       var cfg = STATIONS.map(function (st) {
+        var reqs = [];
+        ROLES.forEach(function (r) {
+          var n = stationReqs[st.id] && stationReqs[st.id][r[0]] || 0;
+          if (n > 0) reqs.push({
+            role: r[0],
+            min: n
+          });
+        });
         return {
           id: st.id,
-          min: stationMins[st.id] || 0
+          reqs: reqs
         };
       });
       var proposed = autoSchedule(staffList, vacations, wsStr, cfg);
@@ -3105,13 +3097,20 @@ function Schichtplaner() {
   }, "Neuen Wochenplan generieren"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       var cfg = STATIONS.map(function (st) {
+        var reqs = [];
+        ROLES.forEach(function (r) {
+          var n = stationReqs[st.id] && stationReqs[st.id][r[0]] || 0;
+          if (n > 0) reqs.push({
+            role: r[0],
+            min: n
+          });
+        });
         return {
           id: st.id,
-          min: stationMins[st.id] || 0
+          reqs: reqs
         };
       });
       var proposed = autoSchedule(staffList, vacations, wsStr, cfg);
-      // Merge: keep existing, add proposed where empty
       setAssignments(function (prev) {
         var merged = Object.assign({}, prev);
         Object.keys(proposed).forEach(function (k) {
@@ -3131,7 +3130,7 @@ function Schichtplaner() {
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "Lücken auffüllen"), /*#__PURE__*/React.createElement("button", {
+  }, "Auffuellen"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowStationCfg(false);
     },
@@ -3151,7 +3150,7 @@ function Schichtplaner() {
       fontSize: 10,
       color: "#868e96"
     }
-  }, "Der Algorithmus verteilt Schichten fair nach Verfügbarkeit, Raumzulassung und max. Wochenstunden.")), /*#__PURE__*/React.createElement("div", {
+  }, "Pro Station und Rolle die Mindestanzahl eintragen. Der Algorithmus verteilt fair nach Verfuegbarkeit und Raumzulassung.")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 1,
@@ -3585,7 +3584,7 @@ function Schichtplaner() {
         fontWeight: 700,
         fontSize: 13
       }
-    }, s.name, " ", s.role === "arzt" && /*#__PURE__*/React.createElement("span", {
+    }, s.name, " ", hasRole(s, "arzt") && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         padding: "1px 5px",
@@ -3595,7 +3594,27 @@ function Schichtplaner() {
         fontWeight: 600,
         marginLeft: 4
       }
-    }, "Arzt"), s.role === "azubi" && /*#__PURE__*/React.createElement("span", {
+    }, "Arzt"), hasRole(s, "znp") && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#e8f5e9",
+        color: "#2e7d32",
+        fontWeight: 600,
+        marginLeft: 4
+      }
+    }, "ZNP"), hasRole(s, "zmv") && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#fce4ec",
+        color: "#c62828",
+        fontWeight: 600,
+        marginLeft: 4
+      }
+    }, "ZMV"), hasRole(s, "azubi") && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         padding: "1px 5px",
@@ -3903,7 +3922,7 @@ function Schichtplaner() {
         borderRadius: "50%",
         background: canWork ? s.color : "#ccc"
       }
-    }), s.name, s.role === "arzt" && /*#__PURE__*/React.createElement("span", {
+    }), s.name, hasRole(s, "arzt") && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 8,
         padding: "0 3px",
