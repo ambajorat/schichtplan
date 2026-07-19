@@ -1593,10 +1593,16 @@ function Schichtplaner() {
 
   // Shift entry state
   const [shiftStaff, setShiftStaff] = useState("");
+  const [shiftDay, setShiftDay] = useState(0);
   const [shiftStation, setShiftStation] = useState("empfang");
   const [shiftSlot, setShiftSlot] = useState(0);
   const [shiftFrom, setShiftFrom] = useState("08:00");
   const [shiftTo, setShiftTo] = useState("14:00");
+
+  // Sync shiftDay with activeDay when tab changes
+  useEffect(() => {
+    setShiftDay(activeDay);
+  }, [activeDay]);
   const addShift = useCallback(() => {
     if (!shiftStaff) return;
     setAssignments(prev => {
@@ -1604,13 +1610,14 @@ function Schichtplaner() {
         ...prev
       };
       TIME_SLOTS.filter(s => s.start >= shiftFrom && s.start < shiftTo).forEach(slot => {
-        const key = `${activeDay}-${shiftStation}-${shiftSlot}-${slot.start}`;
+        const key = `${shiftDay}-${shiftStation}-${shiftSlot}-${slot.start}`;
         const c = n[key] || [];
         if (!c.includes(shiftStaff)) n[key] = [...c, shiftStaff];
       });
       return n;
     });
-  }, [shiftStaff, shiftStation, shiftSlot, shiftFrom, shiftTo, activeDay]);
+    setActiveDay(shiftDay);
+  }, [shiftStaff, shiftDay, shiftStation, shiftSlot, shiftFrom, shiftTo]);
   const removeShift = useCallback(() => {
     if (!shiftStaff) return;
     setAssignments(prev => {
@@ -1618,14 +1625,15 @@ function Schichtplaner() {
         ...prev
       };
       TIME_SLOTS.filter(s => s.start >= shiftFrom && s.start < shiftTo).forEach(slot => {
-        const key = `${activeDay}-${shiftStation}-${shiftSlot}-${slot.start}`;
+        const key = `${shiftDay}-${shiftStation}-${shiftSlot}-${slot.start}`;
         const c = n[key] || [];
         n[key] = c.filter(id => id !== shiftStaff);
         if (!n[key].length) delete n[key];
       });
       return n;
     });
-  }, [shiftStaff, shiftStation, shiftSlot, shiftFrom, shiftTo, activeDay]);
+    setActiveDay(shiftDay);
+  }, [shiftStaff, shiftDay, shiftStation, shiftSlot, shiftFrom, shiftTo]);
   const handleCellClick = useCallback(key => {
     const p = key.split("-");
     const day = parseInt(p[0]);
@@ -1633,14 +1641,13 @@ function Schichtplaner() {
     const slotIdx = parseInt(p[2]);
     const time = p[3];
     if (selectedStaff) {
-      // Pre-fill shift form from clicked cell
       setShiftStaff(selectedStaff);
+      setShiftDay(day);
       setShiftStation(station);
       setShiftSlot(slotIdx);
       setShiftFrom(time);
-      // Auto-set end to a reasonable default if start changed
       const fromMin = timeToMin(time);
-      const toMin = fromMin + 360; // 6 hours default
+      const toMin = fromMin + 360;
       const endH = Math.min(Math.floor(toMin / 60), 20);
       const endM = toMin % 60;
       setShiftTo(`${String(endH).padStart(2, "0")}:${String(endM).padStart(2, "0")}`);
@@ -1950,6 +1957,29 @@ function Schichtplaner() {
       }
     }, s.name, avail ? "" : " (nicht verfügbar)");
   }))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Tag"), /*#__PURE__*/React.createElement("select", {
+    value: shiftDay,
+    onChange: e => {
+      setShiftDay(parseInt(e.target.value));
+      setActiveDay(parseInt(e.target.value));
+    },
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  }, DAYS.map((d, i) => /*#__PURE__*/React.createElement("option", {
+    key: i,
+    value: i
+  }, DAY_SHORT[i])))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: 10,
       fontWeight: 600,
