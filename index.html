@@ -764,19 +764,16 @@ function findFreeSlot(assignments, day, station, from, to) {
 // Auto-scheduler: generate a week plan based on station requirements and staff availability
 function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
   const plan = {};
-  const weekHours = {}; // track hours per person
+  const weekHours = {};
   staffList.forEach(function (s) {
     weekHours[s.id] = 0;
   });
-
-  // For each day
+  const doctorStations = ["zi1", "zi2", "zi3", "zi4"];
   DAYS.forEach(function (_, di) {
-    // Build list of available staff for this day
     const dayAvail = {};
     staffList.forEach(function (s) {
       const av = s.availability ? s.availability[di] : null;
       if (!av) return;
-      // Check vacation
       const dt = new Date(weekStartStr + "T00:00:00");
       dt.setDate(dt.getDate() + di);
       const ds = dt.toISOString().slice(0, 10);
@@ -791,34 +788,28 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         rooms: s.rooms || STATIONS.map(function (x) {
           return x.id;
         }),
-        maxH: s.maxHours || 40
+        maxH: s.maxHours || 40,
+        role: s.role || "mfa"
       };
     });
-
-    // For each time slot on this day
     TIME_SLOTS.forEach(function (slot) {
       const t = timeToMin(slot.start);
 
-      // For each station, check if we need to fill it
+      // First pass: assign min staff per station
       stationConfig.forEach(function (sc) {
         var needed = sc.min;
         if (needed <= 0) return;
-
-        // How many already assigned at this station+time?
         var filled = 0;
         for (var si = 0; si < 10; si++) {
           var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
           if (plan[k] && plan[k].length > 0) filled++;
         }
         if (filled >= needed) return;
-
-        // Find candidates: available at this time, allowed for this station, not already working this slot
         var candidates = [];
         Object.keys(dayAvail).forEach(function (sid) {
           var da = dayAvail[sid];
           if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
           if (da.rooms.indexOf(sc.id) < 0) return;
-          // Check not already assigned at this time slot on any station
           var busy = false;
           STATIONS.forEach(function (st2) {
             for (var si2 = 0; si2 < 10; si2++) {
@@ -827,20 +818,41 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
             }
           });
           if (busy) return;
-          // Check max hours not exceeded
           if (weekHours[sid] >= da.maxH) return;
           candidates.push({
             id: sid,
-            hours: weekHours[sid]
+            hours: weekHours[sid],
+            role: da.role
           });
         });
 
-        // Sort by fewest hours (fair distribution)
-        candidates.sort(function (a, b) {
-          return a.hours - b.hours;
-        });
-
-        // Assign as many as still needed
+        // For Zi 1-4: prioritize doctors if no doctor assigned yet
+        if (doctorStations.indexOf(sc.id) >= 0) {
+          var hasDoctor = false;
+          for (var si4 = 0; si4 < 10; si4++) {
+            var k4 = di + "-" + sc.id + "-" + si4 + "-" + slot.start;
+            if (plan[k4] && plan[k4].length > 0) {
+              var assignedId = plan[k4][0];
+              if (dayAvail[assignedId] && dayAvail[assignedId].role === "arzt") hasDoctor = true;
+            }
+          }
+          if (!hasDoctor) {
+            // Sort doctors first, then by hours
+            candidates.sort(function (a, b) {
+              if (a.role === "arzt" && b.role !== "arzt") return -1;
+              if (a.role !== "arzt" && b.role === "arzt") return 1;
+              return a.hours - b.hours;
+            });
+          } else {
+            candidates.sort(function (a, b) {
+              return a.hours - b.hours;
+            });
+          }
+        } else {
+          candidates.sort(function (a, b) {
+            return a.hours - b.hours;
+          });
+        }
         for (var ci = 0; ci < candidates.length && filled < needed; ci++) {
           var slot2 = 0;
           for (var si3 = 0; si3 < 10; si3++) {
@@ -854,6 +866,58 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
           plan[key] = [candidates[ci].id];
           weekHours[candidates[ci].id] += 0.5;
           filled++;
+        }
+      });
+
+      // Second pass: ensure Zi 1-4 have a doctor if any staff is there
+      doctorStations.forEach(function (stId) {
+        var hasStaff = false,
+          hasDoctor = false;
+        for (var si5 = 0; si5 < 10; si5++) {
+          var k5 = di + "-" + stId + "-" + si5 + "-" + slot.start;
+          if (plan[k5] && plan[k5].length > 0) {
+            hasStaff = true;
+            var aid = plan[k5][0];
+            if (dayAvail[aid] && dayAvail[aid].role === "arzt") hasDoctor = true;
+          }
+        }
+        if (hasStaff && !hasDoctor) {
+          // Try to add a doctor
+          var docCandidates = [];
+          Object.keys(dayAvail).forEach(function (sid) {
+            var da = dayAvail[sid];
+            if (da.role !== "arzt") return;
+            if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
+            if (da.rooms.indexOf(stId) < 0) return;
+            var busy = false;
+            STATIONS.forEach(function (st2) {
+              for (var si6 = 0; si6 < 10; si6++) {
+                var k6 = di + "-" + st2.id + "-" + si6 + "-" + slot.start;
+                if (plan[k6] && plan[k6].indexOf(sid) >= 0) busy = true;
+              }
+            });
+            if (busy) return;
+            if (weekHours[sid] >= da.maxH) return;
+            docCandidates.push({
+              id: sid,
+              hours: weekHours[sid]
+            });
+          });
+          docCandidates.sort(function (a, b) {
+            return a.hours - b.hours;
+          });
+          if (docCandidates.length > 0) {
+            var dSlot = 0;
+            for (var si7 = 0; si7 < 10; si7++) {
+              var k7 = di + "-" + stId + "-" + si7 + "-" + slot.start;
+              if (!plan[k7] || plan[k7].length === 0) {
+                dSlot = si7;
+                break;
+              }
+            }
+            plan[di + "-" + stId + "-" + dSlot + "-" + slot.start] = [docCandidates[0].id];
+            weekHours[docCandidates[0].id] += 0.5;
+          }
         }
       });
     });
@@ -1285,7 +1349,13 @@ function Chip({
       whiteSpace: "nowrap",
       lineHeight: 1.4
     }
-  }, s.name, onRemove && /*#__PURE__*/React.createElement("button", {
+  }, s.role === "arzt" && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: small ? 7 : 8,
+      fontWeight: 800,
+      color: "#1565c0"
+    }
+  }, "A"), s.name, onRemove && /*#__PURE__*/React.createElement("button", {
     onClick: e => {
       e.stopPropagation();
       onRemove(staffId);
@@ -1543,6 +1613,7 @@ function AvailabilityEditor({
   const [av, setAv] = useState(JSON.parse(JSON.stringify(staff.availability || {})));
   const [maxH, setMaxH] = useState(staff.maxHours || 40);
   const [vDays, setVDays] = useState((_staff$vacDays = staff.vacDays) !== null && _staff$vacDays !== void 0 ? _staff$vacDays : 26);
+  const [role, setRole] = useState(staff.role || "mfa");
   const [rooms, setRooms] = useState(staff.rooms || STATIONS.map(function (s) {
     return s.id;
   }));
@@ -1607,6 +1678,31 @@ function AvailabilityEditor({
       marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 11,
+      color: "#6c757d",
+      fontWeight: 600
+    }
+  }, "Rolle"), /*#__PURE__*/React.createElement("select", {
+    value: role,
+    onChange: function (e) {
+      setRole(e.target.value);
+    },
+    style: {
+      display: "block",
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 13,
+      marginTop: 3
+    }
+  }, /*#__PURE__*/React.createElement("option", {
+    value: "mfa"
+  }, "MFA"), /*#__PURE__*/React.createElement("option", {
+    value: "arzt"
+  }, "Arzt / Ärztin"), /*#__PURE__*/React.createElement("option", {
+    value: "azubi"
+  }, "Azubi"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
     style: {
       fontSize: 11,
       color: "#6c757d",
@@ -1782,7 +1878,8 @@ function AvailabilityEditor({
       availability: av,
       maxHours: maxH,
       vacDays: vDays,
-      rooms: rooms
+      rooms: rooms,
+      role: role
     }),
     style: {
       padding: "7px 18px",
@@ -3488,7 +3585,27 @@ function Schichtplaner() {
         fontWeight: 700,
         fontSize: 13
       }
-    }, s.name), /*#__PURE__*/React.createElement("div", {
+    }, s.name, " ", s.role === "arzt" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#e3f2fd",
+        color: "#1565c0",
+        fontWeight: 600,
+        marginLeft: 4
+      }
+    }, "Arzt"), s.role === "azubi" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#fff3e0",
+        color: "#e65100",
+        fontWeight: 600,
+        marginLeft: 4
+      }
+    }, "Azubi")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 10,
         color: "#868e96"
@@ -3786,7 +3903,16 @@ function Schichtplaner() {
         borderRadius: "50%",
         background: canWork ? s.color : "#ccc"
       }
-    }), s.name, absence && /*#__PURE__*/React.createElement("span", {
+    }), s.name, s.role === "arzt" && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 8,
+        padding: "0 3px",
+        borderRadius: 2,
+        background: "#e3f2fd",
+        color: "#1565c0",
+        fontWeight: 700
+      }
+    }, "A"), absence && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9
       }
