@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Schichtplaner — Zahnarztpraxis</title>
+<title>statt-Tipex — Schichtplaner</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -758,11 +758,11 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
   const stL = {};
   STATIONS.forEach(x => stL[x.id] = x.label);
   const hrs = getWeeklyHours(assignments, staff.id);
+  const link = buildPersonLink(assignments, staff, weekStart);
   let txt = `📋 *Schichtplan*\n${fmtDateDE(fmtDate(weekStart))} – ${fmtDateDE(fmtDate(wEnd))}\n\n`;
   txt += `👤 *${staff.name}* (${hrs} Std.)\n\n`;
   const dayEmoji = ["🟦", "🟧", "🟨", "🟩", "🟪"];
   DAYS.forEach((dn, di) => {
-    // Collect all times per station
     const stationTimes = {};
     Object.entries(assignments).forEach(([k, sids]) => {
       if (!(sids !== null && sids !== void 0 && sids.includes(staff.id))) return;
@@ -778,7 +778,6 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
       txt += `${dayEmoji[di]} *${dn}:* _frei_\n`;
       return;
     }
-    // For each station, sort times and merge into ranges
     const parts = [];
     stationKeys.forEach(st => {
       const times = stationTimes[st].sort();
@@ -803,7 +802,6 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
       });
       ranges.forEach(r => parts.push(`${stL[st] || st} ${r.start}–${addEnd(r.end)}`));
     });
-    // Sort parts by start time
     parts.sort((a, b) => {
       const ta = a.match(/\d{2}:\d{2}/);
       const tb = b.match(/\d{2}:\d{2}/);
@@ -811,8 +809,347 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
     });
     txt += `${dayEmoji[di]} *${dn}:* ${parts.join(", ")}\n`;
   });
-  txt += `\n✅ Gute Woche!`;
+  txt += `\n📱 Dein Plan im Browser:\n${link}`;
+  const teamLink = buildTeamLink(assignments, staff, weekStart);
+  txt += `\n\n👥 Gesamtplan:\n${teamLink}`;
+  txt += `\n\n✅ Gute Woche!`;
   return txt;
+}
+
+// Build compact person schedule link
+function buildPersonLink(assignments, staff, weekStart) {
+  const stL = {};
+  STATIONS.forEach(x => stL[x.id] = x.label);
+  const wEnd = new Date(weekStart);
+  wEnd.setDate(wEnd.getDate() + 4);
+  const schedule = [];
+  DAYS.forEach((dn, di) => {
+    const stationTimes = {};
+    Object.entries(assignments).forEach(([k, sids]) => {
+      if (!(sids !== null && sids !== void 0 && sids.includes(staff.id))) return;
+      const p = k.split("-");
+      if (parseInt(p[0]) !== di) return;
+      if (!stationTimes[p[1]]) stationTimes[p[1]] = [];
+      if (!stationTimes[p[1]].includes(p[3])) stationTimes[p[1]].push(p[3]);
+    });
+    const shifts = [];
+    Object.entries(stationTimes).forEach(([st, times]) => {
+      times.sort();
+      const ranges = [];
+      let rs = times[0],
+        re = times[0];
+      for (let i = 1; i < times.length; i++) {
+        if (timeToMin(times[i]) === timeToMin(re) + 30) re = times[i];else {
+          ranges.push([rs, addEnd(re)]);
+          rs = times[i];
+          re = times[i];
+        }
+      }
+      ranges.push([rs, addEnd(re)]);
+      ranges.forEach(r => shifts.push((stL[st] || st) + ":" + r[0] + "-" + r[1]));
+    });
+    schedule.push(shifts.join(","));
+  });
+  const data = {
+    n: staff.name,
+    w: fmtDateDE(fmtDate(weekStart)) + "–" + fmtDateDE(fmtDate(wEnd)),
+    h: getWeeklyHours(assignments, staff.id),
+    s: schedule
+  };
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  const base = window.location.origin + window.location.pathname;
+  return base + "#plan=" + encoded;
+}
+
+// Build compact full team schedule link
+function buildTeamLink(assignments, staffList, weekStart) {
+  const stL = {};
+  STATIONS.forEach(x => stL[x.id] = x.label);
+  const wEnd = new Date(weekStart);
+  wEnd.setDate(wEnd.getDate() + 4);
+  // Extract all shifts as compact array: [personName, dayIndex, station, from, to]
+  const shifts = [];
+  staffList.forEach(staff => {
+    DAYS.forEach((_, di) => {
+      const stationTimes = {};
+      Object.entries(assignments).forEach(([k, sids]) => {
+        if (!(sids !== null && sids !== void 0 && sids.includes(staff.id))) return;
+        const p = k.split("-");
+        if (parseInt(p[0]) !== di) return;
+        if (!stationTimes[p[1]]) stationTimes[p[1]] = [];
+        if (!stationTimes[p[1]].includes(p[3])) stationTimes[p[1]].push(p[3]);
+      });
+      Object.entries(stationTimes).forEach(([st, times]) => {
+        times.sort();
+        let rs = times[0],
+          re = times[0];
+        for (let i = 1; i < times.length; i++) {
+          if (timeToMin(times[i]) === timeToMin(re) + 30) re = times[i];else {
+            shifts.push([staff.name, di, stL[st] || st, rs, addEnd(re)]);
+            rs = times[i];
+            re = times[i];
+          }
+        }
+        shifts.push([staff.name, di, stL[st] || st, rs, addEnd(re)]);
+      });
+    });
+  });
+  const data = {
+    w: fmtDateDE(fmtDate(weekStart)) + "–" + fmtDateDE(fmtDate(wEnd)),
+    t: shifts
+  };
+  const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+  return window.location.origin + window.location.pathname + "#team=" + encoded;
+}
+
+// Read-only full team view
+function ReadOnlyTeamView({
+  data
+}) {
+  const dayEmoji = ["🟦", "🟧", "🟨", "🟩", "🟪"];
+  // Group shifts by day, then by station, then by time
+  const dayData = {};
+  DAYS.forEach((_, di) => dayData[di] = {});
+  (data.t || []).forEach(([name, di, station, from, to]) => {
+    if (!dayData[di]) dayData[di] = {};
+    if (!dayData[di][station]) dayData[di][station] = [];
+    dayData[di][station].push({
+      name,
+      from,
+      to
+    });
+  });
+  // Sort each station's entries by start time
+  Object.values(dayData).forEach(stations => {
+    Object.values(stations).forEach(entries => {
+      entries.sort((a, b) => a.from.localeCompare(b.from));
+    });
+  });
+  // Get unique station order
+  const stationOrder = [];
+  STATIONS.forEach(st => {
+    const label = st.label;
+    DAYS.forEach((_, di) => {
+      if (dayData[di][label] && !stationOrder.includes(label)) stationOrder.push(label);
+    });
+  });
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
+      maxWidth: 600,
+      margin: "0 auto",
+      padding: 16,
+      color: "#212529",
+      minHeight: "100vh"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#868e96",
+      marginBottom: 4
+    }
+  }, "📋 Schichtplan"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      margin: "0 0 2px",
+      letterSpacing: -0.5
+    }
+  }, "Gesamtübersicht"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#6c757d"
+    }
+  }, data.w)), DAYS.map((dn, di) => {
+    const stations = dayData[di] || {};
+    const stKeys = stationOrder.filter(s => stations[s]);
+    if (stKeys.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      key: di,
+      style: {
+        marginBottom: 14,
+        borderRadius: 10,
+        border: "1px solid #e9ecef",
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "8px 14px",
+        background: "#f5f6f7",
+        fontWeight: 700,
+        fontSize: 14,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", null, dayEmoji[di]), " ", dn), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "4px 0"
+      }
+    }, stKeys.map(station => /*#__PURE__*/React.createElement("div", {
+      key: station,
+      style: {
+        padding: "4px 14px"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        fontWeight: 700,
+        color: "#868e96",
+        textTransform: "uppercase",
+        letterSpacing: 0.5,
+        marginBottom: 2
+      }
+    }, station), stations[station].map((e, ei) => /*#__PURE__*/React.createElement("div", {
+      key: ei,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "4px 0",
+        borderBottom: ei < stations[station].length - 1 ? "1px solid #f5f5f5" : "none"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 13,
+        fontWeight: 600
+      }
+    }, e.name), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 12,
+        color: "#495057",
+        fontVariantNumeric: "tabular-nums",
+        background: "#f0f7ff",
+        padding: "2px 8px",
+        borderRadius: 5
+      }
+    }, e.from, "–", e.to)))))));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginTop: 20,
+      fontSize: 11,
+      color: "#ced4da"
+    }
+  }, "statt-Tipex · Schichtplaner"));
+}
+
+// Read-only mobile view component
+function ReadOnlyView({
+  data
+}) {
+  const dayEmoji = ["🟦", "🟧", "🟨", "🟩", "🟪"];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
+      maxWidth: 480,
+      margin: "0 auto",
+      padding: 20,
+      color: "#212529",
+      minHeight: "100vh"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      color: "#868e96",
+      marginBottom: 4
+    }
+  }, "📋 Schichtplan"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontSize: 22,
+      fontWeight: 800,
+      margin: "0 0 4px",
+      letterSpacing: -0.5
+    }
+  }, data.n), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#6c757d"
+    }
+  }, data.w), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#495057",
+      fontWeight: 600,
+      marginTop: 4
+    }
+  }, data.h, " Stunden")), DAYS.map((dn, di) => {
+    const shifts = data.s[di] ? data.s[di].split(",").filter(Boolean) : [];
+    return /*#__PURE__*/React.createElement("div", {
+      key: di,
+      style: {
+        marginBottom: 10,
+        borderRadius: 10,
+        border: "1px solid #e9ecef",
+        overflow: "hidden"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "8px 14px",
+        background: "#f8f9fa",
+        fontWeight: 700,
+        fontSize: 13,
+        display: "flex",
+        alignItems: "center",
+        gap: 6
+      }
+    }, /*#__PURE__*/React.createElement("span", null, dayEmoji[di]), " ", dn), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "8px 14px"
+      }
+    }, shifts.length === 0 ? /*#__PURE__*/React.createElement("div", {
+      style: {
+        color: "#ced4da",
+        fontSize: 13,
+        fontStyle: "italic"
+      }
+    }, "Frei") : shifts.map((sh, si) => {
+      const [station, timeRange] = sh.split(":");
+      const [from, to] = timeRange ? timeRange.split("-") : ["", ""];
+      return /*#__PURE__*/React.createElement("div", {
+        key: si,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "6px 0",
+          borderBottom: si < shifts.length - 1 ? "1px solid #f1f3f5" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 14,
+          fontWeight: 600,
+          color: "#212529"
+        }
+      }, station), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          color: "#495057",
+          fontVariantNumeric: "tabular-nums",
+          background: "#f0f7ff",
+          padding: "2px 8px",
+          borderRadius: 5
+        }
+      }, from, " – ", to));
+    })));
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginTop: 20,
+      fontSize: 11,
+      color: "#ced4da"
+    }
+  }, "statt-Tipex · Schichtplaner"));
 }
 function Chip({
   staffId,
@@ -1757,6 +2094,37 @@ function ShareModal({
 }
 function Schichtplaner() {
   var _staffList$find2, _staffList$find3, _STATIONS$find;
+  // Check for read-only plan link
+  const [roData, setRoData] = useState(null);
+  const [roTeam, setRoTeam] = useState(null);
+  useEffect(() => {
+    const parseHash = h => {
+      if (h.startsWith("#plan=")) {
+        try {
+          setRoData(JSON.parse(decodeURIComponent(escape(atob(h.slice(6))))));
+          setRoTeam(null);
+        } catch (e) {}
+      } else if (h.startsWith("#team=")) {
+        try {
+          setRoTeam(JSON.parse(decodeURIComponent(escape(atob(h.slice(6))))));
+          setRoData(null);
+        } catch (e) {}
+      } else {
+        setRoData(null);
+        setRoTeam(null);
+      }
+    };
+    parseHash(window.location.hash);
+    const onHash = () => parseHash(window.location.hash);
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  if (roData) return /*#__PURE__*/React.createElement(ReadOnlyView, {
+    data: roData
+  });
+  if (roTeam) return /*#__PURE__*/React.createElement(ReadOnlyTeamView, {
+    data: roTeam
+  });
   const [loaded, setLoaded] = useState(false);
   const [staffList, setStaffList] = useState(DEFAULT_STAFF);
   const [assignments, setAssignments] = useState({});
@@ -1984,13 +2352,13 @@ function Schichtplaner() {
       margin: 0,
       letterSpacing: -0.5
     }
-  }, "Schichtplaner"), /*#__PURE__*/React.createElement("p", {
+  }, "statt-Tipex"), /*#__PURE__*/React.createElement("p", {
     style: {
       margin: "2px 0 0",
       fontSize: 11,
       color: "#868e96"
     }
-  }, "Zahnarztpraxis")), /*#__PURE__*/React.createElement("div", {
+  }, "Schichtplaner · Zahnarztpraxis")), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
