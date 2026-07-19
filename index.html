@@ -798,6 +798,23 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
   staffList.forEach(function (s) {
     weekHours[s.id] = 0;
   });
+
+  // Priority order: empfang first, then zi1-4, then rest
+  var priority = {
+    "empfang": 0,
+    "zi1": 1,
+    "zi2": 2,
+    "zi3": 3,
+    "zi4": 4,
+    "buero": 5,
+    "zi5": 6,
+    "zi6": 7,
+    "steri": 8,
+    "springer": 9
+  };
+  var sortedConfig = [].concat(stationConfig).sort(function (a, b) {
+    return (priority[a.id] || 99) - (priority[b.id] || 99);
+  });
   const doctorStations = ["zi1", "zi2", "zi3", "zi4"];
   DAYS.forEach(function (_, di) {
     const dayAvail = {};
@@ -827,7 +844,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
 
       // Two-pass: first assign doctors, then other roles only where a doctor is present
       // Pass 1: Arzt requirements
-      stationConfig.forEach(function (sc) {
+      sortedConfig.forEach(function (sc) {
         if (!sc.reqs || sc.reqs.length === 0) return;
         sc.reqs.forEach(function (req) {
           if (req.role !== "arzt" || req.min <= 0) return;
@@ -880,7 +897,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
       });
 
       // Pass 2: non-Arzt roles, but only at stations that have a doctor (or don't require one)
-      stationConfig.forEach(function (sc) {
+      sortedConfig.forEach(function (sc) {
         if (!sc.reqs || sc.reqs.length === 0) return;
         var needsDoctor = sc.reqs.some(function (r) {
           return r.role === "arzt" && r.min > 0;
@@ -3453,15 +3470,67 @@ function Schichtplaner() {
   const [showStationCfg, setShowStationCfg] = useState(false);
   const ROLES = [["arzt", "Arzt"], ["zfa", "ZFA"], ["znp", "ZNP"], ["zmv", "ZMV"], ["azubi", "Azubi"]];
   const [stationReqs, setStationReqs] = useState(function () {
+    var saved = loadData("praxis-station-reqs", null);
+    if (saved) return saved;
     var m = {};
     STATIONS.forEach(function (s) {
-      m[s.id] = {};
-      m[s.id]["arzt"] = ["zi1", "zi2", "zi3", "zi4"].indexOf(s.id) >= 0 ? 1 : 0;
-      m[s.id]["zfa"] = s.minStaff || 0;
-      m[s.id]["znp"] = 0;
-      m[s.id]["zmv"] = 0;
-      m[s.id]["azubi"] = 0;
+      m[s.id] = {
+        arzt: 0,
+        zfa: 0,
+        znp: 0,
+        zmv: 0,
+        azubi: 0
+      };
     });
+    m["empfang"] = {
+      arzt: 0,
+      zfa: 1,
+      znp: 0,
+      zmv: 0,
+      azubi: 0
+    };
+    m["buero"] = {
+      arzt: 0,
+      zfa: 0,
+      znp: 0,
+      zmv: 1,
+      azubi: 0
+    };
+    m["zi1"] = {
+      arzt: 1,
+      zfa: 1,
+      znp: 0,
+      zmv: 0,
+      azubi: 0
+    };
+    m["zi2"] = {
+      arzt: 1,
+      zfa: 1,
+      znp: 0,
+      zmv: 0,
+      azubi: 0
+    };
+    m["zi3"] = {
+      arzt: 1,
+      zfa: 1,
+      znp: 0,
+      zmv: 0,
+      azubi: 0
+    };
+    m["zi4"] = {
+      arzt: 1,
+      zfa: 1,
+      znp: 0,
+      zmv: 0,
+      azubi: 0
+    };
+    m["steri"] = {
+      arzt: 0,
+      zfa: 1,
+      znp: 0,
+      zmv: 0,
+      azubi: 0
+    };
     return m;
   });
   useEffect(() => {
@@ -3518,9 +3587,10 @@ function Schichtplaner() {
       saveData("praxis-vacations", vacations);
       saveData("praxis-hours", practiceHours);
       saveData("praxis-requests", vacRequests);
+      saveData("praxis-station-reqs", stationReqs);
     }, 500);
     return () => clearTimeout(saveTimer.current);
-  }, [assignments, staffList, vacations, practiceHours, vacRequests, loaded, weekStart]);
+  }, [assignments, staffList, vacations, practiceHours, vacRequests, stationReqs, loaded, weekStart]);
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
@@ -3645,7 +3715,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v0.15"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.0"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -4271,9 +4341,6 @@ function Schichtplaner() {
         return [...prev, v];
       });
     }
-  }), /*#__PURE__*/React.createElement(PracticeHoursManager, {
-    hours: practiceHours,
-    onChange: setPracticeHours
   }), /*#__PURE__*/React.createElement(VacationCalendar, {
     staffList: staffList,
     vacations: vacations
@@ -4282,6 +4349,9 @@ function Schichtplaner() {
     vacations: vacations,
     onAdd: v => setVacations(prev => [...prev, v]),
     onRemove: id => setVacations(prev => prev.filter(x => x.id !== id))
+  }), /*#__PURE__*/React.createElement(PracticeHoursManager, {
+    hours: practiceHours,
+    onChange: setPracticeHours
   })), tab === "team" && /*#__PURE__*/React.createElement("div", null, editingAv ? /*#__PURE__*/React.createElement(AvailabilityEditor, {
     staff: editingAv,
     onCancel: () => setEditingAv(null),
