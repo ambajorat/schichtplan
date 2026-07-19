@@ -903,35 +903,41 @@ function buildTeamLink(assignments, staffList, weekStart) {
 function ReadOnlyTeamView({
   data
 }) {
-  const dayEmoji = ["\u{1f7e6}", "\u{1f7e7}", "\u{1f7e8}", "\u{1f7e9}", "\u{1f7ea}"];
+  const DE = ["Mo", "Di", "Mi", "Do", "Fr"];
   const dayData = {};
   DAYS.forEach((_, di) => dayData[di] = {});
-  (data.d || "").split(";").filter(Boolean).forEach(entry => {
-    const [name, di, station, from, to] = entry.split("~");
-    const d = parseInt(di);
-    if (!dayData[d]) dayData[d] = {};
-    if (!dayData[d][station]) dayData[d][station] = [];
-    dayData[d][station].push({
-      name,
-      from,
-      to
+  (data.d || "").split(";").filter(Boolean).forEach(function (entry) {
+    var parts = entry.split("~");
+    var name = parts[0],
+      di = parseInt(parts[1]),
+      station = parts[2],
+      from = parts[3],
+      to = parts[4];
+    if (!dayData[di]) dayData[di] = {};
+    if (!dayData[di][station]) dayData[di][station] = [];
+    dayData[di][station].push({
+      name: name,
+      from: from,
+      to: to
     });
   });
-  Object.values(dayData).forEach(stations => {
-    Object.values(stations).forEach(entries => {
-      entries.sort((a, b) => a.from.localeCompare(b.from));
+  Object.values(dayData).forEach(function (stations) {
+    Object.values(stations).forEach(function (entries) {
+      entries.sort(function (a, b) {
+        return a.from.localeCompare(b.from);
+      });
     });
   });
-  const stationOrder = [];
-  STATIONS.forEach(st => {
-    const label = st.label;
-    DAYS.forEach((_, di) => {
-      if (dayData[di][label] && !stationOrder.includes(label)) stationOrder.push(label);
+  var stationOrder = [];
+  STATIONS.forEach(function (st) {
+    var label = st.label;
+    DAYS.forEach(function (_, di) {
+      if (dayData[di][label] && stationOrder.indexOf(label) < 0) stationOrder.push(label);
     });
   });
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
+      fontFamily: "system-ui,sans-serif",
       maxWidth: 600,
       margin: "0 auto",
       padding: 16,
@@ -953,17 +959,18 @@ function ReadOnlyTeamView({
     style: {
       fontSize: 20,
       fontWeight: 800,
-      margin: "0 0 2px",
-      letterSpacing: -0.5
+      margin: "0 0 2px"
     }
-  }, "Gesamt\\u00fcbersicht"), /*#__PURE__*/React.createElement("div", {
+  }, "Gesamtplan"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 13,
       color: "#6c757d"
     }
-  }, data.w)), DAYS.map((dn, di) => {
-    const stations = dayData[di] || {};
-    const stKeys = stationOrder.filter(s => stations[s]);
+  }, data.w)), DAYS.map(function (dn, di) {
+    var stations = dayData[di] || {};
+    var stKeys = stationOrder.filter(function (s) {
+      return stations[s];
+    });
     if (stKeys.length === 0) return null;
     return /*#__PURE__*/React.createElement("div", {
       key: di,
@@ -978,53 +985,54 @@ function ReadOnlyTeamView({
         padding: "8px 14px",
         background: "#f5f6f7",
         fontWeight: 700,
-        fontSize: 14,
-        display: "flex",
-        alignItems: "center",
-        gap: 6
+        fontSize: 14
       }
-    }, /*#__PURE__*/React.createElement("span", null, dayEmoji[di]), " ", dn), /*#__PURE__*/React.createElement("div", {
+    }, DE[di] + " " + dn), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "4px 0"
       }
-    }, stKeys.map(station => /*#__PURE__*/React.createElement("div", {
-      key: station,
-      style: {
-        padding: "4px 14px"
-      }
-    }, /*#__PURE__*/React.createElement("div", {
-      style: {
-        fontSize: 10,
-        fontWeight: 700,
-        color: "#868e96",
-        textTransform: "uppercase",
-        letterSpacing: 0.5,
-        marginBottom: 2
-      }
-    }, station), stations[station].map((e, ei) => /*#__PURE__*/React.createElement("div", {
-      key: ei,
-      style: {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "4px 0",
-        borderBottom: ei < stations[station].length - 1 ? "1px solid #f5f5f5" : "none"
-      }
-    }, /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 13,
-        fontWeight: 600
-      }
-    }, e.name), /*#__PURE__*/React.createElement("span", {
-      style: {
-        fontSize: 12,
-        color: "#495057",
-        fontVariantNumeric: "tabular-nums",
-        background: "#f0f7ff",
-        padding: "2px 8px",
-        borderRadius: 5
-      }
-    }, e.from, " \\u2013 ", e.to)))))));
+    }, stKeys.map(function (station) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: station,
+        style: {
+          padding: "4px 14px"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 10,
+          fontWeight: 700,
+          color: "#868e96",
+          textTransform: "uppercase",
+          letterSpacing: 0.5,
+          marginBottom: 2
+        }
+      }, station), stations[station].map(function (e, ei) {
+        return /*#__PURE__*/React.createElement("div", {
+          key: ei,
+          style: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "4px 0",
+            borderBottom: ei < stations[station].length - 1 ? "1px solid #f5f5f5" : "none"
+          }
+        }, /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 13,
+            fontWeight: 600
+          }
+        }, e.name), /*#__PURE__*/React.createElement("span", {
+          style: {
+            fontSize: 12,
+            color: "#495057",
+            fontVariantNumeric: "tabular-nums",
+            background: "#f0f7ff",
+            padding: "2px 8px",
+            borderRadius: 5
+          }
+        }, e.from + " - " + e.to));
+      }));
+    })));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       textAlign: "center",
@@ -1037,10 +1045,10 @@ function ReadOnlyTeamView({
 function ReadOnlyView({
   data
 }) {
-  const dayEmoji = ["\u{1f7e6}", "\u{1f7e7}", "\u{1f7e8}", "\u{1f7e9}", "\u{1f7ea}"];
+  var DE = ["Mo", "Di", "Mi", "Do", "Fr"];
   return /*#__PURE__*/React.createElement("div", {
     style: {
-      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
+      fontFamily: "system-ui,sans-serif",
       maxWidth: 480,
       margin: "0 auto",
       padding: 20,
@@ -1062,8 +1070,7 @@ function ReadOnlyView({
     style: {
       fontSize: 22,
       fontWeight: 800,
-      margin: "0 0 4px",
-      letterSpacing: -0.5
+      margin: "0 0 4px"
     }
   }, data.n), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1077,8 +1084,8 @@ function ReadOnlyView({
       fontWeight: 600,
       marginTop: 4
     }
-  }, data.h, " Stunden")), DAYS.map((dn, di) => {
-    const shifts = data.s[di] ? data.s[di].split(",").filter(Boolean) : [];
+  }, data.h + " Stunden")), DAYS.map(function (dn, di) {
+    var shifts = data.s[di] ? data.s[di].split(",").filter(Boolean) : [];
     return /*#__PURE__*/React.createElement("div", {
       key: di,
       style: {
@@ -1092,12 +1099,9 @@ function ReadOnlyView({
         padding: "8px 14px",
         background: "#f8f9fa",
         fontWeight: 700,
-        fontSize: 13,
-        display: "flex",
-        alignItems: "center",
-        gap: 6
+        fontSize: 13
       }
-    }, /*#__PURE__*/React.createElement("span", null, dayEmoji[di]), " ", dn), /*#__PURE__*/React.createElement("div", {
+    }, DE[di] + " " + dn), /*#__PURE__*/React.createElement("div", {
       style: {
         padding: "8px 14px"
       }
@@ -1107,13 +1111,13 @@ function ReadOnlyView({
         fontSize: 13,
         fontStyle: "italic"
       }
-    }, "Frei") : shifts.map((sh, si) => {
-      const pipeIdx = sh.indexOf("|");
-      const station = pipeIdx >= 0 ? sh.substring(0, pipeIdx) : sh;
-      const timeRange = pipeIdx >= 0 ? sh.substring(pipeIdx + 1) : "";
-      const dashIdx = timeRange.indexOf("-");
-      const from = dashIdx >= 0 ? timeRange.substring(0, dashIdx) : "";
-      const to = dashIdx >= 0 ? timeRange.substring(dashIdx + 1) : "";
+    }, "Frei") : shifts.map(function (sh, si) {
+      var pipeIdx = sh.indexOf("|");
+      var station = pipeIdx >= 0 ? sh.substring(0, pipeIdx) : sh;
+      var timeRange = pipeIdx >= 0 ? sh.substring(pipeIdx + 1) : "";
+      var dashIdx = timeRange.indexOf("-");
+      var from = dashIdx >= 0 ? timeRange.substring(0, dashIdx) : "";
+      var to = dashIdx >= 0 ? timeRange.substring(dashIdx + 1) : "";
       return /*#__PURE__*/React.createElement("div", {
         key: si,
         style: {
@@ -1138,7 +1142,7 @@ function ReadOnlyView({
           padding: "2px 8px",
           borderRadius: 5
         }
-      }, from, " \\u2013 ", to));
+      }, from + " - " + to));
     })));
   }), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2500,7 +2504,80 @@ function Schichtplaner() {
         color: "#adb5bd"
       }
     }, dt.getDate(), "."));
-  })), /*#__PURE__*/React.createElement("div", {
+  })), (() => {
+    const dt = new Date(weekStart);
+    dt.setDate(dt.getDate() + activeDay);
+    const ds = dt.toISOString().slice(0, 10);
+    const absent = vacations.filter(v => ds >= v.from && ds <= v.to).map(v => {
+      const s = staffList.find(x => x.id === v.staffId);
+      return s ? {
+        ...v,
+        name: s.name,
+        color: s.color
+      } : null;
+    }).filter(Boolean);
+    if (absent.length === 0) return null;
+    const byType = {
+      Krank: [],
+      Urlaub: [],
+      Fortbildung: [],
+      Sonstiges: []
+    };
+    absent.forEach(a => {
+      const k = a.note || "Sonstiges";
+      if (!byType[k]) byType[k] = [];
+      byType[k].push(a);
+    });
+    const icons = {
+      Krank: "🤒",
+      Urlaub: "🏖️",
+      Fortbildung: "📚",
+      Sonstiges: "📋"
+    };
+    const colors = {
+      Krank: "#e03131",
+      Urlaub: "#2e7d32",
+      Fortbildung: "#1565c0",
+      Sonstiges: "#757575"
+    };
+    const bgs = {
+      Krank: "#fff0f0",
+      Urlaub: "#e8f5e9",
+      Fortbildung: "#e3f2fd",
+      Sonstiges: "#f5f5f5"
+    };
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 8,
+        display: "flex",
+        gap: 6,
+        flexWrap: "wrap"
+      }
+    }, Object.entries(byType).filter(([, arr]) => arr.length > 0).map(([type, arr]) => /*#__PURE__*/React.createElement("div", {
+      key: type,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "4px 10px",
+        borderRadius: 6,
+        background: bgs[type],
+        border: `1px solid ${colors[type]}33`,
+        fontSize: 11
+      }
+    }, /*#__PURE__*/React.createElement("span", null, icons[type]), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontWeight: 600,
+        color: colors[type]
+      }
+    }, type, ":"), arr.map((a, i) => /*#__PURE__*/React.createElement("span", {
+      key: i,
+      style: {
+        color: a.color,
+        fontWeight: 600
+      }
+    }, a.name, i < arr.length - 1 ? "," : "")))));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 6,
       padding: "5px 10px",
@@ -3078,6 +3155,15 @@ function Schichtplaner() {
       const p = k.split("-");
       return parseInt(p[0]) === shiftModal.day && p[1] === shiftModal.station && (sids === null || sids === void 0 ? void 0 : sids.includes(s.id));
     });
+    const dt = new Date(wsStr + "T00:00:00");
+    dt.setDate(dt.getDate() + shiftModal.day);
+    const ds = dt.toISOString().slice(0, 10);
+    const absence = vacations.find(v => v.staffId === s.id && ds >= v.from && ds <= v.to);
+    const abIcons = {
+      Krank: "🤒",
+      Urlaub: "🏖️",
+      Fortbildung: "📚"
+    };
     return /*#__PURE__*/React.createElement("button", {
       key: s.id,
       onClick: () => addShiftFromModal(s.id),
@@ -3103,7 +3189,11 @@ function Schichtplaner() {
         borderRadius: "50%",
         background: avail ? s.color : "#ccc"
       }
-    }), s.name, !avail && /*#__PURE__*/React.createElement("span", {
+    }), s.name, absence && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9
+      }
+    }, abIcons[absence.note] || "⛔"), !avail && !absence && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9
       }
@@ -3148,7 +3238,32 @@ function Schichtplaner() {
       const dt = new Date(weekStart);
       dt.setDate(dt.getDate() + di);
       return dt.getDate() + ".";
-    })()), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
+    })()), (() => {
+      const dt = new Date(weekStart);
+      dt.setDate(dt.getDate() + di);
+      const ds = dt.toISOString().slice(0, 10);
+      const absent = vacations.filter(v => ds >= v.from && ds <= v.to).map(v => {
+        const s = staffList.find(x => x.id === v.staffId);
+        return s ? {
+          note: v.note,
+          name: s.name
+        } : null;
+      }).filter(Boolean);
+      if (absent.length === 0) return null;
+      const byType = {};
+      absent.forEach(a => {
+        const k = a.note || "Sonstiges";
+        if (!byType[k]) byType[k] = [];
+        byType[k].push(a.name);
+      });
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontSize: 8,
+          color: "#666",
+          marginBottom: 2
+        }
+      }, Object.entries(byType).map(([t, names]) => `${t}: ${names.join(", ")}`).join(" | "));
+    })(), /*#__PURE__*/React.createElement("table", null, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", null, /*#__PURE__*/React.createElement("th", {
       style: {
         width: 36,
         textAlign: "left"
