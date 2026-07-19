@@ -680,22 +680,56 @@ function buildDefault() {
 }
 
 // Migrate old data: split cells with multiple people into separate slots
+function mergePersonSlots(a) {
+  var result = {};
+  var groups = {};
+  Object.keys(a).forEach(function (k) {
+    var sids = a[k];
+    if (!sids || !sids.length) return;
+    var p = k.split("-");
+    var gs = p[0] + "-" + p[1];
+    if (!groups[gs]) groups[gs] = {};
+    sids.forEach(function (sid) {
+      if (!groups[gs][sid]) groups[gs][sid] = [];
+      groups[gs][sid].push({
+        slot: parseInt(p[2]),
+        time: p[3]
+      });
+    });
+  });
+  Object.keys(groups).forEach(function (gs) {
+    var people = groups[gs];
+    var slotMap = {};
+    var nextSlot = 0;
+    Object.keys(people).forEach(function (sid) {
+      if (slotMap[sid] === undefined) {
+        slotMap[sid] = nextSlot;
+        nextSlot++;
+      }
+      people[sid].forEach(function (e) {
+        result[gs + "-" + slotMap[sid] + "-" + e.time] = [sid];
+      });
+    });
+  });
+  return result;
+}
 function migrateAssignments(a) {
-  const result = {};
-  Object.entries(a).forEach(([k, sids]) => {
+  var result = {};
+  Object.keys(a).forEach(function (k) {
+    var sids = a[k];
     if (!sids || sids.length === 0) return;
     if (sids.length === 1) {
       result[k] = sids;
       return;
     }
-    const p = k.split("-");
-    const day = p[0],
+    var p = k.split("-");
+    var day = p[0],
       station = p[1],
       time = p[3];
-    sids.forEach(sid => {
-      let placed = false;
-      for (let s = 0; s < 20; s++) {
-        const nk = `${day}-${station}-${s}-${time}`;
+    sids.forEach(function (sid) {
+      var placed = false;
+      for (var s = 0; s < 20; s++) {
+        var nk = day + "-" + station + "-" + s + "-" + time;
         if (!result[nk] || result[nk].length === 0) {
           result[nk] = [sid];
           placed = true;
@@ -703,12 +737,12 @@ function migrateAssignments(a) {
         }
       }
       if (!placed) {
-        const nk = `${day}-${station}-0-${time}`;
-        result[nk] = result[nk] ? [...result[nk], sid] : [sid];
+        var nk = day + "-" + station + "-0-" + time;
+        result[nk] = result[nk] ? result[nk].concat([sid]) : [sid];
       }
     });
   });
-  return result;
+  return mergePersonSlots(result);
 }
 function isAvailable(staff, dayIdx, time, vacations, wsStr) {
   var _staff$availability;
@@ -4186,7 +4220,7 @@ function Schichtplaner() {
       times.forEach(function (t) {
         n[day + "-" + toStation + "-" + slot + "-" + t] = [staffId];
       });
-      return n;
+      return mergePersonSlots(n);
     });
     setShiftModal(null);
   }, []);
@@ -4447,7 +4481,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.0"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.1"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
