@@ -56,6 +56,10 @@ const STATIONS = [{
   id: "steri",
   label: "Steri",
   minStaff: 1
+}, {
+  id: "springer",
+  label: "Springer",
+  minStaff: 0
 }];
 function genSlots() {
   const s = [];
@@ -117,6 +121,21 @@ function getRoles(staff) {
   if (Array.isArray(roles)) return roles;
   if (roles && roles !== "zfa") return [roles];
   return ["zfa"];
+}
+
+// Get practice hours for a specific day. Returns {from,to} or null (closed)
+function getPracticeHoursForDay(practiceHours, weekStartStr, dayIdx) {
+  var dt = new Date(weekStartStr + "T00:00:00");
+  dt.setDate(dt.getDate() + dayIdx);
+  var ds = dt.toISOString().slice(0, 10);
+  // Find matching special period (last match wins)
+  var match = null;
+  (practiceHours || []).forEach(function (p) {
+    if (ds >= p.from && ds <= p.to && p.hours && p.hours[dayIdx]) {
+      match = p.hours[dayIdx];
+    }
+  });
+  return match; // null = normal hours
 }
 const DEFAULT_STAFF = [{
   id: "martina",
@@ -806,14 +825,79 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
     TIME_SLOTS.forEach(function (slot) {
       const t = timeToMin(slot.start);
 
-      // For each station, fill role-based requirements
+      // Two-pass: first assign doctors, then other roles only where a doctor is present
+      // Pass 1: Arzt requirements
       stationConfig.forEach(function (sc) {
         if (!sc.reqs || sc.reqs.length === 0) return;
         sc.reqs.forEach(function (req) {
-          var needed = req.min;
-          if (needed <= 0) return;
+          if (req.role !== "arzt" || req.min <= 0) return;
+          var filled = 0;
+          for (var si = 0; si < 10; si++) {
+            var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
+            if (plan[k] && plan[k].length > 0) {
+              var aid = plan[k][0];
+              if (dayAvail[aid] && dayAvail[aid].roles.indexOf("arzt") >= 0) filled++;
+            }
+          }
+          if (filled >= req.min) return;
+          var candidates = [];
+          Object.keys(dayAvail).forEach(function (sid) {
+            var da = dayAvail[sid];
+            if (t < timeToMin(da.from) || t >= timeToMin(da.to)) return;
+            if (da.rooms.indexOf(sc.id) < 0) return;
+            if (da.roles.indexOf("arzt") < 0) return;
+            var busy = false;
+            STATIONS.forEach(function (st2) {
+              for (var si2 = 0; si2 < 10; si2++) {
+                var k2 = di + "-" + st2.id + "-" + si2 + "-" + slot.start;
+                if (plan[k2] && plan[k2].indexOf(sid) >= 0) busy = true;
+              }
+            });
+            if (busy) return;
+            if (weekHours[sid] >= da.maxH) return;
+            candidates.push({
+              id: sid,
+              hours: weekHours[sid]
+            });
+          });
+          candidates.sort(function (a, b) {
+            return a.hours - b.hours;
+          });
+          for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
+            var slot2 = 0;
+            for (var si3 = 0; si3 < 10; si3++) {
+              var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
+              if (!plan[k3] || plan[k3].length === 0) {
+                slot2 = si3;
+                break;
+              }
+            }
+            plan[di + "-" + sc.id + "-" + slot2 + "-" + slot.start] = [candidates[ci].id];
+            weekHours[candidates[ci].id] += 0.5;
+            filled++;
+          }
+        });
+      });
 
-          // Count how many of this role already assigned
+      // Pass 2: non-Arzt roles, but only at stations that have a doctor (or don't require one)
+      stationConfig.forEach(function (sc) {
+        if (!sc.reqs || sc.reqs.length === 0) return;
+        var needsDoctor = sc.reqs.some(function (r) {
+          return r.role === "arzt" && r.min > 0;
+        });
+        if (needsDoctor) {
+          var hasDoctor = false;
+          for (var si = 0; si < 10; si++) {
+            var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
+            if (plan[k] && plan[k].length > 0) {
+              var aid = plan[k][0];
+              if (dayAvail[aid] && dayAvail[aid].roles.indexOf("arzt") >= 0) hasDoctor = true;
+            }
+          }
+          if (!hasDoctor) return; // skip non-doctor roles if no doctor present
+        }
+        sc.reqs.forEach(function (req) {
+          if (req.role === "arzt" || req.min <= 0) return; // already handled
           var filled = 0;
           for (var si = 0; si < 10; si++) {
             var k = di + "-" + sc.id + "-" + si + "-" + slot.start;
@@ -822,7 +906,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
               if (dayAvail[aid] && dayAvail[aid].roles.indexOf(req.role) >= 0) filled++;
             }
           }
-          if (filled >= needed) return;
+          if (filled >= req.min) return;
           var candidates = [];
           Object.keys(dayAvail).forEach(function (sid) {
             var da = dayAvail[sid];
@@ -846,7 +930,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
           candidates.sort(function (a, b) {
             return a.hours - b.hours;
           });
-          for (var ci = 0; ci < candidates.length && filled < needed; ci++) {
+          for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
             var slot2 = 0;
             for (var si3 = 0; si3 < 10; si3++) {
               var k3 = di + "-" + sc.id + "-" + si3 + "-" + slot.start;
@@ -1321,7 +1405,8 @@ function StationGrid({
   violations,
   onCellClick,
   selectedStaff,
-  staffList
+  staffList,
+  practiceHours
 }) {
   const dynSlots = getDynSlots(assignments, day);
   const stBg = ["#e8f4fd", "#fef9ee", "#f0faf4", "#fef4f4", "#f3eefa", "#fef9ee", "#e8f4fd", "#fef4f4", "#f9f0f0"];
@@ -1392,17 +1477,21 @@ function StationGrid({
     const isCon = conflicts.has(key),
       isVio = violations.has(key);
     const selColor = selectedStaff ? (_staffList$find = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find === void 0 ? void 0 : _staffList$find.color : null;
+    const slotMin = timeToMin(slot.start);
+    const isClosed = practiceHours && (slotMin < timeToMin(practiceHours.from) || slotMin >= timeToMin(practiceHours.to));
     return /*#__PURE__*/React.createElement("td", {
       key: `${st.id}-${idx}`,
-      onClick: () => onCellClick(key),
+      onClick: () => {
+        if (!isClosed) onCellClick(key);
+      },
       style: {
         borderLeft: idx === 0 ? "2px solid #868e96" : "1px solid #dee2e6",
         borderBottom: slot.start.endsWith(":00") ? "1px solid #ccc" : "1px solid #f1f3f5",
         padding: "1px 2px",
         minWidth: 52,
         height: 21,
-        cursor: "pointer",
-        background: isCon ? "#fff0f0" : isVio ? "#fff8e1" : selectedStaff && assigned.includes(selectedStaff) ? selColor + "15" : "transparent"
+        cursor: isClosed ? "default" : "pointer",
+        background: isClosed ? "#f0f0f0" : isCon ? "#fff0f0" : isVio ? "#fff8e1" : selectedStaff && assigned.includes(selectedStaff) ? selColor + "15" : "transparent"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1854,6 +1943,312 @@ function AvailabilityEditor({
       cursor: "pointer"
     }
   }, "Abbrechen")));
+}
+function PracticeHoursManager({
+  hours,
+  onChange
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [label, setLabel] = useState("");
+  const [dayHours, setDayHours] = useState(function () {
+    var h = {};
+    for (var i = 0; i < 5; i++) h[i] = {
+      from: "08:00",
+      to: "14:00",
+      closed: false
+    };
+    return h;
+  });
+  const sorted = [...(hours || [])].sort(function (a, b) {
+    return a.from.localeCompare(b.from);
+  });
+  const today = new Date().toISOString().slice(0, 10);
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Sonderöffnungszeiten"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: 14,
+      background: "#f8f9fa",
+      borderRadius: 8,
+      marginBottom: 12,
+      border: "1px solid #e9ecef"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 8,
+      flexWrap: "wrap",
+      alignItems: "flex-end",
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Bezeichnung"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: label,
+    onChange: function (e) {
+      setLabel(e.target.value);
+    },
+    placeholder: "z.B. Sommerferien",
+    style: {
+      padding: "5px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12,
+      width: 140
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Von"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: function (e) {
+      setFrom(e.target.value);
+    },
+    style: {
+      padding: "4px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#868e96",
+      display: "block",
+      marginBottom: 2
+    }
+  }, "Bis"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: to,
+    onChange: function (e) {
+      setTo(e.target.value);
+    },
+    style: {
+      padding: "4px 8px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 12
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#6c757d",
+      marginBottom: 4
+    }
+  }, "Öffnungszeiten pro Tag:"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexWrap: "wrap",
+      gap: 6,
+      marginBottom: 10
+    }
+  }, DAYS.map(function (d, di) {
+    var dh = dayHours[di];
+    return /*#__PURE__*/React.createElement("div", {
+      key: di,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        fontSize: 11
+      }
+    }, /*#__PURE__*/React.createElement("label", {
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 3,
+        cursor: "pointer",
+        minWidth: 30
+      }
+    }, /*#__PURE__*/React.createElement("input", {
+      type: "checkbox",
+      checked: !dh.closed,
+      onChange: function () {
+        setDayHours(function (prev) {
+          var n = JSON.parse(JSON.stringify(prev));
+          n[di].closed = !n[di].closed;
+          return n;
+        });
+      },
+      style: {
+        accentColor: "#4A90D9"
+      }
+    }), DAY_SHORT[di]), !dh.closed && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("input", {
+      type: "time",
+      value: dh.from,
+      onChange: function (e) {
+        setDayHours(function (prev) {
+          var n = JSON.parse(JSON.stringify(prev));
+          n[di].from = e.target.value;
+          return n;
+        });
+      },
+      style: {
+        padding: "2px 4px",
+        border: "1px solid #dee2e6",
+        borderRadius: 4,
+        fontSize: 11,
+        width: 75
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        color: "#868e96"
+      }
+    }, "-"), /*#__PURE__*/React.createElement("input", {
+      type: "time",
+      value: dh.to,
+      onChange: function (e) {
+        setDayHours(function (prev) {
+          var n = JSON.parse(JSON.stringify(prev));
+          n[di].to = e.target.value;
+          return n;
+        });
+      },
+      style: {
+        padding: "2px 4px",
+        border: "1px solid #dee2e6",
+        borderRadius: 4,
+        fontSize: 11,
+        width: 75
+      }
+    })), dh.closed && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: "#e03131",
+        fontWeight: 600
+      }
+    }, "geschlossen"));
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (!from || !to || !label) return;
+      var h = {};
+      for (var i = 0; i < 5; i++) {
+        if (!dayHours[i].closed) h[i] = {
+          from: dayHours[i].from,
+          to: dayHours[i].to
+        };
+      }
+      onChange([...(hours || []), {
+        id: Date.now().toString(),
+        label: label,
+        from: from,
+        to: to,
+        hours: h
+      }]);
+      setFrom("");
+      setTo("");
+      setLabel("");
+    },
+    style: {
+      padding: "6px 16px",
+      borderRadius: 6,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "+ Zeitraum anlegen")), sorted.length === 0 && /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 20,
+      color: "#ced4da",
+      fontSize: 12
+    }
+  }, "Keine Sonderzeiten hinterlegt - normale Öffnungszeiten gelten"), sorted.map(function (p) {
+    var isPast = p.to < today;
+    var isActive = today >= p.from && today <= p.to;
+    return /*#__PURE__*/React.createElement("div", {
+      key: p.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "8px 12px",
+        borderRadius: 6,
+        background: isActive ? "#f0f7ff" : "#fff",
+        border: isActive ? "1px solid #4A90D955" : "1px solid #e9ecef",
+        marginBottom: 4,
+        opacity: isPast ? 0.45 : 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        flex: 1
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 600,
+        color: "#212529"
+      }
+    }, p.label, " ", isActive && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#4A90D9",
+        color: "#fff",
+        marginLeft: 4
+      }
+    }, "aktiv")), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#6c757d",
+        fontVariantNumeric: "tabular-nums"
+      }
+    }, fmtDateDE(p.from), " - ", fmtDateDE(p.to)), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 10,
+        color: "#868e96",
+        marginTop: 2
+      }
+    }, DAYS.map(function (d, di) {
+      return p.hours[di] ? DAY_SHORT[di] + " " + p.hours[di].from + "-" + p.hours[di].to : DAY_SHORT[di] + " geschl.";
+    }).join(" · "))), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        onChange((hours || []).filter(function (x) {
+          return x.id !== p.id;
+        }));
+      },
+      style: {
+        background: "none",
+        border: "none",
+        color: "#e03131",
+        cursor: "pointer",
+        fontSize: 14,
+        fontWeight: 700,
+        padding: "0 4px"
+      }
+    }, "×"));
+  }));
 }
 function VacationCalendar({
   staffList,
@@ -2580,6 +2975,9 @@ function Schichtplaner() {
   const [editingAv, setEditingAv] = useState(null);
   const [tab, setTab] = useState("plan");
   const [showShare, setShowShare] = useState(false);
+  const [practiceHours, setPracticeHours] = useState(function () {
+    return loadData("praxis-hours", []);
+  });
   const [shiftModal, setShiftModal] = useState(null);
   const [smFrom, setSmFrom] = useState("08:00");
   const [smTo, setSmTo] = useState("14:00");
@@ -2649,9 +3047,10 @@ function Schichtplaner() {
       saveData(`praxis-${weekKey(weekStart)}`, assignments);
       saveData("praxis-staff", staffList);
       saveData("praxis-vacations", vacations);
+      saveData("praxis-hours", practiceHours);
     }, 500);
     return () => clearTimeout(saveTimer.current);
-  }, [assignments, staffList, vacations, loaded, weekStart]);
+  }, [assignments, staffList, vacations, practiceHours, loaded, weekStart]);
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
@@ -2776,7 +3175,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v0.10"))), /*#__PURE__*/React.createElement("div", {
+  }, "v0.14"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -3265,14 +3664,29 @@ function Schichtplaner() {
       fontWeight: 500
     },
     className: "no-print"
-  }, "Klicke auf eine Zelle, um eine Schicht einzutragen oder zu bearbeiten."), /*#__PURE__*/React.createElement(StationGrid, {
+  }, "Klicke auf eine Zelle, um eine Schicht einzutragen oder zu bearbeiten."), (() => {
+    var ph = getPracticeHoursForDay(practiceHours, wsStr, activeDay);
+    if (!ph) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginBottom: 6,
+        padding: "5px 10px",
+        background: "#fff3e0",
+        borderRadius: 5,
+        fontSize: 10.5,
+        color: "#e65100",
+        fontWeight: 600
+      }
+    }, "Sonderzeiten aktiv: ", ph.from, " - ", ph.to);
+  })(), /*#__PURE__*/React.createElement(StationGrid, {
     day: activeDay,
     assignments: assignments,
     conflicts: conflicts,
     violations: violations,
     onCellClick: handleCellClick,
     selectedStaff: selectedStaff,
-    staffList: staffList
+    staffList: staffList,
+    practiceHours: getPracticeHoursForDay(practiceHours, wsStr, activeDay)
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -3360,7 +3774,10 @@ function Schichtplaner() {
       color: "#868e96",
       fontSize: 12
     }
-  }, "Person auswählen"))), tab === "vacation" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(VacationCalendar, {
+  }, "Person auswählen"))), tab === "vacation" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(PracticeHoursManager, {
+    hours: practiceHours,
+    onChange: setPracticeHours
+  }), /*#__PURE__*/React.createElement(VacationCalendar, {
     staffList: staffList,
     vacations: vacations
   }), /*#__PURE__*/React.createElement(VacationManager, {
