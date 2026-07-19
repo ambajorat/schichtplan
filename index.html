@@ -89,7 +89,10 @@ function getMonday(d) {
   return dt;
 }
 function fmtDate(d) {
-  return d.toISOString().slice(0, 10);
+  var y = d.getFullYear(),
+    m = String(d.getMonth() + 1).padStart(2, "0"),
+    day = String(d.getDate()).padStart(2, "0");
+  return y + "-" + m + "-" + day;
 }
 function fmtDateDE(s) {
   const [y, m, d] = s.split("-");
@@ -4481,7 +4484,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.1"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.2"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
