@@ -798,23 +798,26 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
   staffList.forEach(function (s) {
     weekHours[s.id] = 0;
   });
-  var priority = {
-    "empfang": 0,
-    "zi1": 1,
-    "zi2": 2,
-    "zi3": 3,
-    "zi4": 4,
-    "buero": 5,
-    "zi5": 6,
-    "zi6": 7,
-    "steri": 8,
-    "springer": 9
-  };
-  var sortedConfig = [].concat(stationConfig).sort(function (a, b) {
-    return (priority[a.id] || 99) - (priority[b.id] || 99);
-  });
+  function assignBlock(dayIdx, stationId, staffId, fromTime, toTime) {
+    var slot = 0;
+    for (var si = 0; si < 10; si++) {
+      var tk = dayIdx + "-" + stationId + "-" + si + "-" + fromTime;
+      if (!plan[tk] || plan[tk].length === 0) {
+        slot = si;
+        break;
+      }
+    }
+    TIME_SLOTS.forEach(function (ts) {
+      var t = timeToMin(ts.start);
+      if (t >= timeToMin(fromTime) && t < timeToMin(toTime)) {
+        plan[dayIdx + "-" + stationId + "-" + slot + "-" + ts.start] = [staffId];
+      }
+    });
+    weekHours[staffId] += (timeToMin(toTime) - timeToMin(fromTime)) / 60;
+  }
   DAYS.forEach(function (_, di) {
-    var dayAvail = {};
+    // Get available staff for this day
+    var avail = [];
     staffList.forEach(function (s) {
       var av = s.availability ? s.availability[di] : null;
       if (!av) return;
@@ -826,7 +829,8 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         if (v.staffId === s.id && ds >= v.from && ds <= v.to) onLeave = true;
       });
       if (onLeave) return;
-      dayAvail[s.id] = {
+      avail.push({
+        id: s.id,
         from: av.from,
         to: av.to,
         rooms: s.rooms || STATIONS.map(function (x) {
@@ -834,129 +838,120 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         }),
         maxH: s.maxHours || 40,
         roles: getRoles(s)
-      };
+      });
     });
+    var used = {}; // sid -> true (assigned this day)
 
-    // For each station+role requirement, assign a person for a full shift
-    // A person CAN work at multiple stations if their time allows (non-overlapping blocks)
-    // Track assigned time ranges per person: personBusy[sid] = [{from,to}]
-    var personBusy = {};
-    function isPersonFree(sid, from, to) {
-      if (!personBusy[sid]) return true;
-      var fMin = timeToMin(from),
-        tMin = timeToMin(to);
-      for (var i = 0; i < personBusy[sid].length; i++) {
-        var b = personBusy[sid][i];
-        if (fMin < b.to && tMin > b.from) return false; // overlap
-      }
-      return true;
-    }
-    function markBusy(sid, from, to) {
-      if (!personBusy[sid]) personBusy[sid] = [];
-      personBusy[sid].push({
-        from: timeToMin(from),
-        to: timeToMin(to)
+    function findAndAssign(stationId, role, count) {
+      var filled = 0;
+      var candidates = avail.filter(function (a) {
+        if (used[a.id]) return false;
+        if (a.rooms.indexOf(stationId) < 0) return false;
+        if (a.roles.indexOf(role) < 0) return false;
+        if (weekHours[a.id] >= a.maxH) return false;
+        return true;
       });
-    }
-    function assignShift(stId, sid, from, to) {
-      var slot = 0;
-      for (var si = 0; si < 10; si++) {
-        var testKey = di + "-" + stId + "-" + si + "-" + from;
-        if (!plan[testKey] || plan[testKey].length === 0) {
-          slot = si;
-          break;
-        }
-      }
-      TIME_SLOTS.forEach(function (ts) {
-        var t = timeToMin(ts.start);
-        if (t >= timeToMin(from) && t < timeToMin(to)) {
-          plan[di + "-" + stId + "-" + slot + "-" + ts.start] = [sid];
-        }
+      candidates.sort(function (a, b) {
+        return weekHours[a.id] - weekHours[b.id];
       });
-      var hrs = (timeToMin(to) - timeToMin(from)) / 60;
-      weekHours[sid] += hrs;
-      markBusy(sid, from, to);
+      var result = [];
+      for (var i = 0; i < candidates.length && filled < count; i++) {
+        var c = candidates[i];
+        assignBlock(di, stationId, c.id, c.from, c.to);
+        used[c.id] = true;
+        result.push(c);
+        filled++;
+      }
+      return result;
     }
 
-    // Process each station in priority order
-    sortedConfig.forEach(function (sc) {
-      if (!sc.reqs) return;
-      var hasArztReq = sc.reqs.some(function (r) {
+    // Build station order: process each station config
+    // Separate into rooms-needing-arzt and rooms-not-needing-arzt
+    var arztRooms = [];
+    var normalRooms = [];
+    stationConfig.forEach(function (sc) {
+      if (!sc.reqs || sc.reqs.length === 0) return;
+      var needsArzt = sc.reqs.some(function (r) {
         return r.role === "arzt" && r.min > 0;
       });
+      if (needsArzt) arztRooms.push(sc);else normalRooms.push(sc);
+    });
 
-      // First: try to assign doctors
-      if (hasArztReq) {
-        var arztReq = sc.reqs.find(function (r) {
-          return r.role === "arzt";
-        });
-        var arztFilled = 0;
-        var candidates = [];
-        Object.keys(dayAvail).forEach(function (sid) {
-          var da = dayAvail[sid];
-          if (da.rooms.indexOf(sc.id) < 0) return;
-          if (da.roles.indexOf("arzt") < 0) return;
-          if (!isPersonFree(sid, da.from, da.to)) return;
-          if (weekHours[sid] >= da.maxH) return;
-          candidates.push({
-            id: sid,
-            from: da.from,
-            to: da.to,
-            hours: weekHours[sid]
-          });
-        });
-        candidates.sort(function (a, b) {
-          return a.hours - b.hours;
-        });
-        for (var ci = 0; ci < candidates.length && arztFilled < arztReq.min; ci++) {
-          assignShift(sc.id, candidates[ci].id, candidates[ci].from, candidates[ci].to);
-          arztFilled++;
-        }
-      }
+    // Priority sort
+    var prio = {
+      "empfang": 0,
+      "buero": 1,
+      "steri": 2,
+      "zi1": 3,
+      "zi2": 4,
+      "zi3": 5,
+      "zi4": 6,
+      "zi5": 7,
+      "zi6": 8,
+      "springer": 9
+    };
+    arztRooms.sort(function (a, b) {
+      return (prio[a.id] || 5) - (prio[b.id] || 5);
+    });
+    normalRooms.sort(function (a, b) {
+      return (prio[a.id] || 5) - (prio[b.id] || 5);
+    });
 
-      // Then: assign other roles - but ONLY if doctor is present (for rooms that require one)
-      var hasArztAssigned = false;
-      if (hasArztReq) {
-        Object.keys(personBusy).forEach(function (sid) {
-          if (dayAvail[sid] && dayAvail[sid].roles.indexOf("arzt") >= 0) {
-            // Check if this doctor is assigned to THIS station
-            var found = false;
-            for (var si = 0; si < 10; si++) {
-              var k = di + "-" + sc.id + "-" + si + "-" + dayAvail[sid].from;
-              if (plan[k] && plan[k].indexOf(sid) >= 0) found = true;
-            }
-            if (found) hasArztAssigned = true;
-          }
-        });
-        if (!hasArztAssigned) return; // No doctor at this station -> skip other roles
-      }
+    // SCHRITT 1: Arzt-Raeume - erst Arzt zuweisen, dann nur wenn Arzt da ist die anderen
+    arztRooms.forEach(function (room) {
+      var arztReq = room.reqs.find(function (r) {
+        return r.role === "arzt";
+      });
+      var arztCount = arztReq ? arztReq.min : 0;
 
-      // Assign non-arzt roles
-      sc.reqs.forEach(function (req) {
+      // Assign doctors
+      var docs = findAndAssign(room.id, "arzt", arztCount);
+
+      // Only if at least one doctor was placed: assign other roles
+      if (docs.length === 0) return;
+      var docFrom = docs[0].from;
+      var docTo = docs[0].to;
+      room.reqs.forEach(function (req) {
         if (req.role === "arzt" || req.min <= 0) return;
-        var filled = 0;
-        var candidates = [];
-        Object.keys(dayAvail).forEach(function (sid) {
-          var da = dayAvail[sid];
-          if (da.rooms.indexOf(sc.id) < 0) return;
-          if (da.roles.indexOf(req.role) < 0) return;
-          if (!isPersonFree(sid, da.from, da.to)) return;
-          if (weekHours[sid] >= da.maxH) return;
-          candidates.push({
-            id: sid,
-            from: da.from,
-            to: da.to,
-            hours: weekHours[sid]
-          });
+        // Find assistants
+        var candidates = avail.filter(function (a) {
+          if (used[a.id]) return false;
+          if (a.rooms.indexOf(room.id) < 0) return false;
+          if (a.roles.indexOf(req.role) < 0) return false;
+          if (weekHours[a.id] >= a.maxH) return false;
+          return true;
         });
         candidates.sort(function (a, b) {
-          return a.hours - b.hours;
+          return weekHours[a.id] - weekHours[b.id];
         });
-        for (var ci = 0; ci < candidates.length && filled < req.min; ci++) {
-          assignShift(sc.id, candidates[ci].id, candidates[ci].from, candidates[ci].to);
+        var filled = 0;
+        for (var i = 0; i < candidates.length && filled < req.min; i++) {
+          var c = candidates[i];
+          // Clip assistant time to doctor time
+          var sf = timeToMin(c.from) > timeToMin(docFrom) ? c.from : docFrom;
+          var st = timeToMin(c.to) < timeToMin(docTo) ? c.to : docTo;
+          if (timeToMin(st) <= timeToMin(sf)) continue;
+          assignBlock(di, room.id, c.id, sf, st);
+          used[c.id] = true;
           filled++;
         }
       });
+    });
+
+    // SCHRITT 2: Normale Raeume (Empfang, Buero, Steri etc.)
+    normalRooms.forEach(function (room) {
+      room.reqs.forEach(function (req) {
+        if (req.min <= 0) return;
+        findAndAssign(room.id, req.role, req.min);
+      });
+    });
+
+    // SCHRITT 3: Uebrige -> Springer
+    avail.forEach(function (a) {
+      if (used[a.id]) return;
+      if (weekHours[a.id] >= a.maxH) return;
+      assignBlock(di, "springer", a.id, a.from, a.to);
+      used[a.id] = true;
     });
   });
   return plan;
@@ -4323,7 +4318,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.7"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.9"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
