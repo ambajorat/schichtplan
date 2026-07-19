@@ -4315,99 +4315,92 @@ function Schichtplaner() {
   });
 
   // PIN lock
-  if (!isUnlocked) {
-    var storedPin = loadData("praxis-pin", "");
-    if (storedPin) {
-      return /*#__PURE__*/React.createElement("div", {
-        style: {
-          fontFamily: "system-ui,sans-serif",
-          maxWidth: 400,
-          margin: "0 auto",
-          padding: 40,
-          textAlign: "center",
-          minHeight: "100vh",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center"
-        }
-      }, /*#__PURE__*/React.createElement("div", {
-        style: {
-          display: "inline-block",
-          padding: "6px 16px",
-          borderRadius: 20,
-          background: "#212529",
-          color: "#fff",
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: 1,
-          textTransform: "uppercase",
-          marginBottom: 16
-        }
-      }, "statt-Tipex"), /*#__PURE__*/React.createElement("h2", {
-        style: {
-          fontSize: 18,
-          fontWeight: 700,
-          marginBottom: 16
-        }
-      }, "PIN eingeben"), /*#__PURE__*/React.createElement("input", {
-        type: "password",
-        value: pinInput,
-        onChange: function (e) {
-          setPinInput(e.target.value);
-        },
-        onKeyDown: function (e) {
-          if (e.key === "Enter") {
-            if (pinInput === storedPin) {
-              setIsUnlocked(true);
-              saveData("praxis-unlocked", true);
-            } else {
-              setPinInput("");
-            }
-          }
-        },
-        placeholder: "PIN",
-        style: {
-          padding: "12px 20px",
-          border: "2px solid #dee2e6",
-          borderRadius: 10,
-          fontSize: 18,
-          textAlign: "center",
-          width: 160,
-          marginBottom: 12,
-          letterSpacing: 8
-        }
-      }), /*#__PURE__*/React.createElement("button", {
-        onClick: function () {
-          if (pinInput === storedPin) {
+  var storedPin = loadData("praxis-pin", "");
+  if (!isUnlocked && storedPin) {
+    return /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontFamily: "system-ui,sans-serif",
+        maxWidth: 400,
+        margin: "0 auto",
+        padding: 40,
+        textAlign: "center",
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: "inline-block",
+        padding: "6px 16px",
+        borderRadius: 20,
+        background: "#212529",
+        color: "#fff",
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: 1,
+        textTransform: "uppercase",
+        marginBottom: 16
+      }
+    }, "statt-Tipex"), /*#__PURE__*/React.createElement("h2", {
+      style: {
+        fontSize: 18,
+        fontWeight: 700,
+        marginBottom: 16
+      }
+    }, "PIN eingeben"), /*#__PURE__*/React.createElement("input", {
+      id: "pin-unlock",
+      type: "password",
+      placeholder: "PIN",
+      onKeyDown: function (e) {
+        if (e.key === "Enter") {
+          var val = document.getElementById("pin-unlock").value;
+          if (val === storedPin) {
             setIsUnlocked(true);
             saveData("praxis-unlocked", true);
           } else {
-            setPinInput("");
+            document.getElementById("pin-unlock").value = "";
           }
-        },
-        style: {
-          padding: "10px 30px",
-          borderRadius: 8,
-          border: "none",
-          background: "#212529",
-          color: "#fff",
-          fontSize: 14,
-          fontWeight: 600,
-          cursor: "pointer"
         }
-      }, "Entsperren"), /*#__PURE__*/React.createElement("div", {
-        style: {
-          marginTop: 16,
-          fontSize: 11,
-          color: "#ced4da"
+      },
+      style: {
+        padding: "12px 20px",
+        border: "2px solid #dee2e6",
+        borderRadius: 10,
+        fontSize: 18,
+        textAlign: "center",
+        width: 160,
+        marginBottom: 12,
+        letterSpacing: 8
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        var val = document.getElementById("pin-unlock").value;
+        if (val === storedPin) {
+          setIsUnlocked(true);
+          saveData("praxis-unlocked", true);
+        } else {
+          document.getElementById("pin-unlock").value = "";
         }
-      }, "Nur die Praxisleitung kann den Plan bearbeiten."));
-    } else {
-      // No PIN set yet - unlock and show PIN setup hint
-      setIsUnlocked(true);
-      saveData("praxis-unlocked", true);
-    }
+      },
+      style: {
+        padding: "10px 30px",
+        borderRadius: 8,
+        border: "none",
+        background: "#212529",
+        color: "#fff",
+        fontSize: 14,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, "Entsperren"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        marginTop: 16,
+        fontSize: 11,
+        color: "#ced4da"
+      }
+    }, "Nur die Praxisleitung kann den Plan bearbeiten."));
   }
   const prevWeek = () => {
     const d = new Date(weekStart);
@@ -4492,7 +4485,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.4"))), /*#__PURE__*/React.createElement("div", {
+  }, "v3.5"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
