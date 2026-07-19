@@ -798,6 +798,10 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
   staffList.forEach(function (s) {
     weekHours[s.id] = 0;
   });
+
+  // Opening hours (default 07:30-20:00)
+  var openFrom = "07:30",
+    openTo = "20:00";
   function assignBlock(dayIdx, stationId, staffId, fromTime, toTime) {
     var slot = 0;
     for (var si = 0; si < 10; si++) {
@@ -816,7 +820,6 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
     weekHours[staffId] += (timeToMin(toTime) - timeToMin(fromTime)) / 60;
   }
   DAYS.forEach(function (_, di) {
-    // Get available staff for this day
     var avail = [];
     staffList.forEach(function (s) {
       var av = s.availability ? s.availability[di] : null;
@@ -840,185 +843,234 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig) {
         roles: getRoles(s)
       });
     });
-    var used = {}; // sid -> true (assigned this day)
 
-    function findAndAssign(stationId, role, count) {
-      var filled = 0;
+    // Track busy times per person: busySlots[sid] = Set of time strings
+    var busySlots = {};
+    function isFree(sid, time) {
+      return !busySlots[sid] || !busySlots[sid][time];
+    }
+    function markBusy(sid, fromT, toT) {
+      if (!busySlots[sid]) busySlots[sid] = {};
+      TIME_SLOTS.forEach(function (ts) {
+        var t = timeToMin(ts.start);
+        if (t >= timeToMin(fromT) && t < timeToMin(toT)) busySlots[sid][ts.start] = true;
+      });
+    }
+    function getFreePeriod(person, stFrom, stTo) {
+      // Find the longest free block within the person's availability and the station's needed window
+      var pFrom = timeToMin(person.from) > timeToMin(stFrom) ? person.from : stFrom;
+      var pTo = timeToMin(person.to) < timeToMin(stTo) ? person.to : stTo;
+      if (timeToMin(pTo) <= timeToMin(pFrom)) return null;
+      // Check if actually free in this window
+      var freeFrom = null,
+        freeTo = null;
+      TIME_SLOTS.forEach(function (ts) {
+        var t = timeToMin(ts.start);
+        if (t >= timeToMin(pFrom) && t < timeToMin(pTo)) {
+          if (isFree(person.id, ts.start)) {
+            if (!freeFrom) freeFrom = ts.start;
+            freeTo = ts.start;
+          }
+        }
+      });
+      if (!freeFrom) return null;
+      return {
+        from: freeFrom,
+        to: addEnd(freeTo)
+      };
+    }
+
+    // Cover a time range at a station with people of a given role
+    // Returns true if fully covered
+    function coverStation(stationId, role, fromT, toT) {
       var candidates = avail.filter(function (a) {
-        if (used[a.id]) return false;
         if (a.rooms.indexOf(stationId) < 0) return false;
         if (a.roles.indexOf(role) < 0) return false;
         if (weekHours[a.id] >= a.maxH) return false;
-        return true;
+        var period = getFreePeriod(a, fromT, toT);
+        return period !== null;
       });
       candidates.sort(function (a, b) {
         return weekHours[a.id] - weekHours[b.id];
       });
-      var result = [];
-      for (var i = 0; i < candidates.length && filled < count; i++) {
-        var c = candidates[i];
-        assignBlock(di, stationId, c.id, c.from, c.to);
-        used[c.id] = true;
-        result.push(c);
-        filled++;
+      // Greedily fill the time range
+      var covered = {};
+      TIME_SLOTS.forEach(function (ts) {
+        var t = timeToMin(ts.start);
+        if (t >= timeToMin(fromT) && t < timeToMin(toT)) covered[ts.start] = false;
+      });
+      var assigned = [];
+      for (var ci = 0; ci < candidates.length; ci++) {
+        var c = candidates[ci];
+        var period = getFreePeriod(c, fromT, toT);
+        if (!period) continue;
+        // Check if this candidate covers any uncovered slot
+        var coversNew = false;
+        TIME_SLOTS.forEach(function (ts) {
+          var t = timeToMin(ts.start);
+          if (t >= timeToMin(period.from) && t < timeToMin(period.to) && covered[ts.start] === false) coversNew = true;
+        });
+        if (!coversNew) continue;
+        assignBlock(di, stationId, c.id, period.from, period.to);
+        markBusy(c.id, period.from, period.to);
+        assigned.push(c);
+        TIME_SLOTS.forEach(function (ts) {
+          var t = timeToMin(ts.start);
+          if (t >= timeToMin(period.from) && t < timeToMin(period.to)) covered[ts.start] = true;
+        });
+        // Check if fully covered
+        var allCovered = true;
+        Object.keys(covered).forEach(function (k) {
+          if (!covered[k]) allCovered = false;
+        });
+        if (allCovered) break;
       }
-      return result;
+      return assigned;
     }
 
-    // Build station order: process each station config
-    // Separate into rooms-needing-arzt and rooms-not-needing-arzt
-    var arztRooms = [];
-    var normalRooms = [];
+    // SCHRITT 1: Empfang - volle Abdeckung
     stationConfig.forEach(function (sc) {
-      if (!sc.reqs || sc.reqs.length === 0) return;
-      var needsArzt = sc.reqs.some(function (r) {
-        return r.role === "arzt" && r.min > 0;
-      });
-      if (needsArzt) arztRooms.push(sc);else normalRooms.push(sc);
-    });
-
-    // Priority sort
-    var prio = {
-      "empfang": 0,
-      "buero": 1,
-      "steri": 2,
-      "zi1": 3,
-      "zi2": 4,
-      "zi3": 5,
-      "zi4": 6,
-      "zi5": 7,
-      "zi6": 8,
-      "springer": 9
-    };
-    arztRooms.sort(function (a, b) {
-      return (prio[a.id] || 5) - (prio[b.id] || 5);
-    });
-    normalRooms.sort(function (a, b) {
-      return (prio[a.id] || 5) - (prio[b.id] || 5);
-    });
-
-    // SCHRITT 1: Empfang IMMER zuerst besetzen
-    normalRooms.filter(function (r) {
-      return r.id === "empfang";
-    }).forEach(function (room) {
-      room.reqs.forEach(function (req) {
+      if (sc.id !== "empfang" || !sc.reqs) return;
+      sc.reqs.forEach(function (req) {
         if (req.min <= 0) return;
-        findAndAssign(room.id, req.role, req.min);
+        coverStation("empfang", req.role, openFrom, openTo);
       });
     });
 
-    // SCHRITT 2: Arzt-Raeume - Arzt + Assistenz als Paar, nie Arzt allein
+    // SCHRITT 2: Arzt-Raeume (Zi 1-4) - Arzt+Assistenz als Paar
+    var arztRooms = [];
+    stationConfig.forEach(function (sc) {
+      if (!sc.reqs) return;
+      if (sc.reqs.some(function (r) {
+        return r.role === "arzt" && r.min > 0;
+      })) arztRooms.push(sc);
+    });
+    arztRooms.sort(function (a, b) {
+      var p = {
+        "zi1": 1,
+        "zi2": 2,
+        "zi3": 3,
+        "zi4": 4
+      };
+      return (p[a.id] || 9) - (p[b.id] || 9);
+    });
     arztRooms.forEach(function (room) {
-      var arztReq = room.reqs.find(function (r) {
-        return r.role === "arzt";
-      });
-      var arztCount = arztReq ? arztReq.min : 0;
-
       // Find available doctors
       var docCandidates = avail.filter(function (a) {
-        if (used[a.id]) return false;
         if (a.rooms.indexOf(room.id) < 0) return false;
         if (a.roles.indexOf("arzt") < 0) return false;
         if (weekHours[a.id] >= a.maxH) return false;
-        return true;
+        var period = getFreePeriod(a, openFrom, openTo);
+        return period !== null;
       });
       docCandidates.sort(function (a, b) {
         return weekHours[a.id] - weekHours[b.id];
       });
-      for (var dci = 0; dci < docCandidates.length && dci < arztCount; dci++) {
+      var arztReq = room.reqs.find(function (r) {
+        return r.role === "arzt";
+      });
+      var needed = arztReq ? arztReq.min : 1;
+      for (var dci = 0; dci < docCandidates.length && dci < needed; dci++) {
         var doc = docCandidates[dci];
+        var docPeriod = getFreePeriod(doc, openFrom, openTo);
+        if (!docPeriod) continue;
 
-        // Find assistant for this doctor BEFORE committing
+        // Find assistant (ZFA, fallback Azubi) who overlaps with doctor
         var otherReqs = room.reqs.filter(function (r) {
           return r.role !== "arzt" && r.min > 0;
         });
-        var assistantFound = true;
-        var assistants = [];
+        var allAssistants = [];
+        var allFound = true;
         otherReqs.forEach(function (req) {
+          // Try primary role first
           var candidates = avail.filter(function (a) {
-            if (used[a.id] || a.id === doc.id) return false;
-            if (assistants.some(function (x) {
+            if (a.id === doc.id) return false;
+            if (allAssistants.some(function (x) {
               return x.id === a.id;
             })) return false;
             if (a.rooms.indexOf(room.id) < 0) return false;
             if (a.roles.indexOf(req.role) < 0) return false;
             if (weekHours[a.id] >= a.maxH) return false;
-            var sf = timeToMin(a.from) > timeToMin(doc.from) ? a.from : doc.from;
-            var st = timeToMin(a.to) < timeToMin(doc.to) ? a.to : doc.to;
-            if (timeToMin(st) <= timeToMin(sf)) return false;
-            return true;
+            var period = getFreePeriod(a, docPeriod.from, docPeriod.to);
+            return period !== null;
           });
           candidates.sort(function (a, b) {
             return weekHours[a.id] - weekHours[b.id];
           });
-          if (candidates.length >= req.min) {
-            for (var i = 0; i < req.min; i++) assistants.push(candidates[i]);
-          } else {
-            // Fallback: try Azubi
-            var azubiCandidates = avail.filter(function (a) {
-              if (used[a.id] || a.id === doc.id) return false;
-              if (assistants.some(function (x) {
+          if (candidates.length < req.min) {
+            // Fallback: Azubi
+            var azubis = avail.filter(function (a) {
+              if (a.id === doc.id) return false;
+              if (allAssistants.some(function (x) {
+                return x.id === a.id;
+              })) return false;
+              if (candidates.some(function (x) {
                 return x.id === a.id;
               })) return false;
               if (a.rooms.indexOf(room.id) < 0) return false;
               if (a.roles.indexOf("azubi") < 0) return false;
               if (weekHours[a.id] >= a.maxH) return false;
-              var sf = timeToMin(a.from) > timeToMin(doc.from) ? a.from : doc.from;
-              var st = timeToMin(a.to) < timeToMin(doc.to) ? a.to : doc.to;
-              if (timeToMin(st) <= timeToMin(sf)) return false;
-              return true;
+              var period = getFreePeriod(a, docPeriod.from, docPeriod.to);
+              return period !== null;
             });
-            azubiCandidates.sort(function (a, b) {
+            azubis.sort(function (a, b) {
               return weekHours[a.id] - weekHours[b.id];
             });
-            var still = req.min - candidates.length;
-            for (var i = 0; i < candidates.length; i++) assistants.push(candidates[i]);
-            for (var j = 0; j < azubiCandidates.length && j < still; j++) assistants.push(azubiCandidates[j]);
-            if (assistants.length < req.min) assistantFound = false;
+            candidates = candidates.concat(azubis);
+          }
+          if (candidates.length >= req.min) {
+            for (var i = 0; i < req.min; i++) allAssistants.push(candidates[i]);
+          } else if (candidates.length > 0) {
+            for (var i = 0; i < candidates.length; i++) allAssistants.push(candidates[i]);
+          } else {
+            allFound = false;
           }
         });
 
-        // Only assign if we have both doctor AND all required assistants
-        if (!assistantFound || assistants.length === 0) continue;
+        // Need at least one assistant
+        if (allAssistants.length === 0) continue;
 
-        // Commit: assign doctor
-        assignBlock(di, room.id, doc.id, doc.from, doc.to);
-        used[doc.id] = true;
+        // Commit doctor
+        assignBlock(di, room.id, doc.id, docPeriod.from, docPeriod.to);
+        markBusy(doc.id, docPeriod.from, docPeriod.to);
 
-        // Commit: assign assistants (clipped to doctor time)
-        assistants.forEach(function (ast) {
-          var sf = timeToMin(ast.from) > timeToMin(doc.from) ? ast.from : doc.from;
-          var st = timeToMin(ast.to) < timeToMin(doc.to) ? ast.to : doc.to;
-          assignBlock(di, room.id, ast.id, sf, st);
-          used[ast.id] = true;
+        // Commit assistants (clipped to doctor time)
+        allAssistants.forEach(function (ast) {
+          var period = getFreePeriod(ast, docPeriod.from, docPeriod.to);
+          if (period) {
+            assignBlock(di, room.id, ast.id, period.from, period.to);
+            markBusy(ast.id, period.from, period.to);
+          }
         });
       }
     });
 
-    // SCHRITT 3: Prophylaxe-Raeume (Zi 5 + Zi 6) - NUR ZNP
-    var prophylaxeIds = ["zi5", "zi6"];
-    normalRooms.filter(function (r) {
-      return prophylaxeIds.indexOf(r.id) >= 0;
-    }).forEach(function (room) {
-      findAndAssign(room.id, "znp", 1);
+    // SCHRITT 3: Prophylaxe (Zi 5 + Zi 6) - nur ZNP
+    ["zi5", "zi6"].forEach(function (stId) {
+      coverStation(stId, "znp", openFrom, openTo);
     });
 
-    // SCHRITT 4: Restliche Stationen (Buero, Steri etc.)
-    normalRooms.filter(function (r) {
-      return r.id !== "empfang" && prophylaxeIds.indexOf(r.id) < 0;
-    }).forEach(function (room) {
-      room.reqs.forEach(function (req) {
+    // SCHRITT 4: Rest (Buero, Steri etc.)
+    stationConfig.forEach(function (sc) {
+      if (sc.id === "empfang" || !sc.reqs) return;
+      if (sc.reqs.some(function (r) {
+        return r.role === "arzt" && r.min > 0;
+      })) return; // arzt rooms done
+      if (sc.id === "zi5" || sc.id === "zi6") return; // prophylaxe done
+      if (sc.id === "springer") return;
+      sc.reqs.forEach(function (req) {
         if (req.min <= 0) return;
-        findAndAssign(room.id, req.role, req.min);
+        coverStation(sc.id, req.role, openFrom, openTo);
       });
     });
 
     // SCHRITT 5: Uebrige -> Springer
     avail.forEach(function (a) {
-      if (used[a.id]) return;
       if (weekHours[a.id] >= a.maxH) return;
-      assignBlock(di, "springer", a.id, a.from, a.to);
-      used[a.id] = true;
+      var period = getFreePeriod(a, openFrom, openTo);
+      if (!period) return;
+      assignBlock(di, "springer", a.id, period.from, period.to);
+      markBusy(a.id, period.from, period.to);
     });
   });
   return plan;
@@ -4385,7 +4437,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v2.4"))), /*#__PURE__*/React.createElement("div", {
+  }, "v2.5"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
