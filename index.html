@@ -1431,6 +1431,431 @@ function ReadOnlyView({
     }
   }, "statt-Tipex v1.0")));
 }
+function VacationRequestPage({
+  data
+}) {
+  var [from, setFrom] = useState("");
+  var [to, setTo] = useState("");
+  var [note, setNote] = useState("Urlaub");
+  var [comment, setComment] = useState("");
+  var [sent, setSent] = useState(false);
+  var name = data.n || "";
+  var phone = data.p || "";
+  function submit() {
+    if (!from || !to) return;
+    var days = 0;
+    var d1 = new Date(from + "T00:00:00"),
+      d2 = new Date(to + "T00:00:00");
+    for (var d = new Date(d1); d <= d2; d.setDate(d.getDate() + 1)) {
+      var wd = d.getDay();
+      if (wd > 0 && wd < 6) days++;
+    }
+    var fDE = function (s) {
+      var p = s.split("-");
+      return p[2] + "." + p[1] + "." + p[0];
+    };
+    var txt = "Urlaubsantrag von *" + name + "*\n\n";
+    txt += note + ": " + fDE(from) + " - " + fDE(to) + " (" + days + " Tage)\n";
+    if (comment) txt += "Bemerkung: " + comment + "\n";
+    txt += "\nBitte im statt-Tipex genehmigen.";
+    if (phone) {
+      window.open("https://api.whatsapp.com/send?phone=" + phone + "&text=" + encodeURIComponent(txt), "_blank");
+    } else {
+      window.open("https://api.whatsapp.com/send?text=" + encodeURIComponent(txt), "_blank");
+    }
+    setSent(true);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontFamily: '-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',
+      maxWidth: 480,
+      margin: "0 auto",
+      padding: 20,
+      color: "#212529",
+      minHeight: "100vh",
+      background: "linear-gradient(180deg, #e8f5e9 0%, #fff 200px)"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "inline-block",
+      padding: "6px 16px",
+      borderRadius: 20,
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 10
+    }
+  }, "statt-Tipex"), /*#__PURE__*/React.createElement("h1", {
+    style: {
+      fontSize: 24,
+      fontWeight: 800,
+      margin: "0 0 4px"
+    }
+  }, "Urlaubsantrag"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 14,
+      color: "#6c757d"
+    }
+  }, name)), sent ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      padding: 40
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 40,
+      marginBottom: 10
+    }
+  }, "\\u2705"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 16,
+      fontWeight: 700,
+      color: "#2e7d32"
+    }
+  }, "Antrag gesendet!"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 13,
+      color: "#6c757d",
+      marginTop: 6
+    }
+  }, "Dein Antrag wird per WhatsApp weitergeleitet.")) : /*#__PURE__*/React.createElement("div", {
+    style: {
+      borderRadius: 14,
+      overflow: "hidden",
+      boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
+      background: "#fff"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      padding: "16px 20px"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Art"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6
+    }
+  }, [["Urlaub", "Urlaub"], ["Fortbildung", "Fortbildung"], ["Sonstiges", "Sonstiges"]].map(function (r) {
+    return /*#__PURE__*/React.createElement("button", {
+      key: r[0],
+      onClick: function () {
+        setNote(r[0]);
+      },
+      style: {
+        flex: 1,
+        padding: "8px 4px",
+        borderRadius: 8,
+        border: note === r[0] ? "2px solid #2e7d32" : "1.5px solid #dee2e6",
+        background: note === r[0] ? "#e8f5e9" : "#fff",
+        color: note === r[0] ? "#2e7d32" : "#495057",
+        fontSize: 12,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, r[1]);
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Von"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: from,
+    onChange: function (e) {
+      setFrom(e.target.value);
+    },
+    style: {
+      width: "100%",
+      padding: "10px",
+      border: "1px solid #dee2e6",
+      borderRadius: 8,
+      fontSize: 14
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      flex: 1
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Bis"), /*#__PURE__*/React.createElement("input", {
+    type: "date",
+    value: to,
+    onChange: function (e) {
+      setTo(e.target.value);
+    },
+    style: {
+      width: "100%",
+      padding: "10px",
+      border: "1px solid #dee2e6",
+      borderRadius: 8,
+      fontSize: 14
+    }
+  }))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: {
+      fontSize: 12,
+      fontWeight: 600,
+      color: "#6c757d",
+      display: "block",
+      marginBottom: 4
+    }
+  }, "Bemerkung (optional)"), /*#__PURE__*/React.createElement("input", {
+    type: "text",
+    value: comment,
+    onChange: function (e) {
+      setComment(e.target.value);
+    },
+    placeholder: "z.B. Familienfeier",
+    style: {
+      width: "100%",
+      padding: "10px",
+      border: "1px solid #dee2e6",
+      borderRadius: 8,
+      fontSize: 14,
+      boxSizing: "border-box"
+    }
+  })), /*#__PURE__*/React.createElement("button", {
+    onClick: submit,
+    disabled: !from || !to,
+    style: {
+      width: "100%",
+      padding: "12px",
+      borderRadius: 10,
+      border: "none",
+      background: from && to ? "#2e7d32" : "#dee2e6",
+      color: from && to ? "#fff" : "#868e96",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: from && to ? "pointer" : "default"
+    }
+  }, "Per WhatsApp senden"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      textAlign: "center",
+      marginTop: 24,
+      fontSize: 10,
+      color: "#ced4da"
+    }
+  }, "statt-Tipex"));
+}
+function MobileStationView({
+  day,
+  assignments,
+  staffList,
+  onCellClick,
+  vacations,
+  wsStr
+}) {
+  var stL = {};
+  STATIONS.forEach(function (st) {
+    stL[st.id] = st.label;
+  });
+  // For each station, collect all people with their time ranges
+  var stationData = [];
+  STATIONS.forEach(function (st) {
+    var people = {};
+    Object.entries(assignments).forEach(function (entry) {
+      var k = entry[0],
+        sids = entry[1];
+      if (!sids || !sids.length) return;
+      var p = k.split("-");
+      if (parseInt(p[0]) !== day || p[1] !== st.id) return;
+      sids.forEach(function (sid) {
+        if (!people[sid]) people[sid] = [];
+        people[sid].push(p[3]);
+      });
+    });
+    var entries = [];
+    Object.entries(people).forEach(function (pe) {
+      var sid = pe[0],
+        times = pe[1];
+      times.sort();
+      var ranges = [];
+      var rs = times[0],
+        re = times[0];
+      for (var i = 1; i < times.length; i++) {
+        if (timeToMin(times[i]) === timeToMin(re) + 30) re = times[i];else {
+          ranges.push({
+            from: rs,
+            to: addEnd(re)
+          });
+          rs = times[i];
+          re = times[i];
+        }
+      }
+      ranges.push({
+        from: rs,
+        to: addEnd(re)
+      });
+      var s = staffList.find(function (x) {
+        return x.id === sid;
+      });
+      if (s) entries.push({
+        staff: s,
+        ranges: ranges
+      });
+    });
+    entries.sort(function (a, b) {
+      return (a.ranges[0] ? a.ranges[0].from : "").localeCompare(b.ranges[0] ? b.ranges[0].from : "");
+    });
+    stationData.push({
+      station: st,
+      entries: entries
+    });
+  });
+  var stBg = ["#e8f4fd", "#fef9ee", "#f0faf4", "#fef4f4", "#f3eafa", "#fef9ee", "#e8f4fd", "#fef4f4", "#f9f0f0", "#f5f5f5"];
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 8
+    }
+  }, stationData.map(function (sd, si) {
+    if (sd.entries.length === 0) return /*#__PURE__*/React.createElement("div", {
+      key: sd.station.id,
+      style: {
+        padding: "10px 14px",
+        borderRadius: 10,
+        background: "#f8f9fa",
+        border: "1px solid #e9ecef",
+        opacity: 0.5
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 12,
+        fontWeight: 700,
+        color: "#868e96"
+      }
+    }, sd.station.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 11,
+        color: "#ced4da",
+        fontStyle: "italic"
+      }
+    }, "nicht besetzt"));
+    return /*#__PURE__*/React.createElement("div", {
+      key: sd.station.id,
+      style: {
+        borderRadius: 10,
+        overflow: "hidden",
+        border: "1px solid #dee2e6",
+        boxShadow: "0 1px 4px rgba(0,0,0,0.05)"
+      }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "8px 14px",
+        background: stBg[si] || "#f5f6f7",
+        fontWeight: 700,
+        fontSize: 13,
+        color: "#212529",
+        borderBottom: "1px solid #dee2e6"
+      }
+    }, sd.station.label), /*#__PURE__*/React.createElement("div", {
+      style: {
+        padding: "4px 10px",
+        background: "#fff"
+      }
+    }, sd.entries.map(function (e, ei) {
+      return /*#__PURE__*/React.createElement("div", {
+        key: ei,
+        style: {
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "6px 4px",
+          borderBottom: ei < sd.entries.length - 1 ? "1px solid #f1f3f5" : "none"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          alignItems: "center",
+          gap: 6
+        }
+      }, /*#__PURE__*/React.createElement("span", {
+        style: {
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          background: e.staff.color,
+          flexShrink: 0
+        }
+      }), /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 13,
+          fontWeight: 600,
+          color: e.staff.color
+        }
+      }, e.staff.name), hasRole(e.staff, "arzt") && /*#__PURE__*/React.createElement("span", {
+        style: {
+          fontSize: 8,
+          padding: "1px 4px",
+          borderRadius: 3,
+          background: "#e3f2fd",
+          color: "#1565c0",
+          fontWeight: 700
+        }
+      }, "A")), /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "flex",
+          gap: 4
+        }
+      }, e.ranges.map(function (r, ri) {
+        return /*#__PURE__*/React.createElement("span", {
+          key: ri,
+          style: {
+            fontSize: 11,
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+            color: "#495057",
+            background: "#f0f7ff",
+            padding: "2px 8px",
+            borderRadius: 5
+          }
+        }, r.from + " - " + r.to);
+      })));
+    })));
+  }));
+}
 function Chip({
   staffId,
   small,
@@ -3510,6 +3935,11 @@ function Schichtplaner() {
   // Check for read-only plan link
   const [roData, setRoData] = useState(null);
   const [roTeam, setRoTeam] = useState(null);
+  const [roRequest, setRoRequest] = useState(null);
+  const [isUnlocked, setIsUnlocked] = useState(function () {
+    return loadData("praxis-unlocked", false);
+  });
+  const [pinInput, setPinInput] = useState("");
   const [loaded, setLoaded] = useState(false);
   const [staffList, setStaffList] = useState(DEFAULT_STAFF);
   const [assignments, setAssignments] = useState({});
@@ -3531,6 +3961,18 @@ function Schichtplaner() {
   const [smFrom, setSmFrom] = useState("08:00");
   const [smTo, setSmTo] = useState("14:00");
   const [showStationCfg, setShowStationCfg] = useState(false);
+  const [isMobile, setIsMobile] = useState(function () {
+    return typeof window !== "undefined" && window.innerWidth < 768;
+  });
+  useEffect(function () {
+    function onResize() {
+      setIsMobile(window.innerWidth < 768);
+    }
+    window.addEventListener("resize", onResize);
+    return function () {
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
   const ROLES = [["arzt", "Arzt"], ["zfa", "ZFA"], ["znp", "ZNP"], ["zmv", "ZMV"], ["azubi", "Azubi"]];
   const [stationReqs, setStationReqs] = useState(function () {
     var saved = loadData("praxis-station-reqs", null);
@@ -3644,15 +4086,24 @@ function Schichtplaner() {
         try {
           setRoData(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
           setRoTeam(null);
+          setRoRequest(null);
         } catch (e) {}
       } else if (h.startsWith("#team=")) {
         try {
           setRoTeam(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(6))));
           setRoData(null);
+          setRoRequest(null);
+        } catch (e) {}
+      } else if (h.startsWith("#request=")) {
+        try {
+          setRoRequest(JSON.parse(LZString.decompressFromEncodedURIComponent(h.slice(9))));
+          setRoData(null);
+          setRoTeam(null);
         } catch (e) {}
       } else {
         setRoData(null);
         setRoTeam(null);
+        setRoRequest(null);
       }
     };
     parseHash(window.location.hash);
@@ -3695,6 +4146,105 @@ function Schichtplaner() {
   if (roTeam) return /*#__PURE__*/React.createElement(ReadOnlyTeamView, {
     data: roTeam
   });
+  if (roRequest) return /*#__PURE__*/React.createElement(VacationRequestPage, {
+    data: roRequest
+  });
+
+  // PIN lock
+  if (!isUnlocked) {
+    var storedPin = loadData("praxis-pin", "");
+    if (storedPin) {
+      return /*#__PURE__*/React.createElement("div", {
+        style: {
+          fontFamily: "system-ui,sans-serif",
+          maxWidth: 400,
+          margin: "0 auto",
+          padding: 40,
+          textAlign: "center",
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center"
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
+          display: "inline-block",
+          padding: "6px 16px",
+          borderRadius: 20,
+          background: "#212529",
+          color: "#fff",
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: 1,
+          textTransform: "uppercase",
+          marginBottom: 16
+        }
+      }, "statt-Tipex"), /*#__PURE__*/React.createElement("h2", {
+        style: {
+          fontSize: 18,
+          fontWeight: 700,
+          marginBottom: 16
+        }
+      }, "PIN eingeben"), /*#__PURE__*/React.createElement("input", {
+        type: "password",
+        value: pinInput,
+        onChange: function (e) {
+          setPinInput(e.target.value);
+        },
+        onKeyDown: function (e) {
+          if (e.key === "Enter") {
+            if (pinInput === storedPin) {
+              setIsUnlocked(true);
+              saveData("praxis-unlocked", true);
+            } else {
+              setPinInput("");
+            }
+          }
+        },
+        placeholder: "PIN",
+        style: {
+          padding: "12px 20px",
+          border: "2px solid #dee2e6",
+          borderRadius: 10,
+          fontSize: 18,
+          textAlign: "center",
+          width: 160,
+          marginBottom: 12,
+          letterSpacing: 8
+        }
+      }), /*#__PURE__*/React.createElement("button", {
+        onClick: function () {
+          if (pinInput === storedPin) {
+            setIsUnlocked(true);
+            saveData("praxis-unlocked", true);
+          } else {
+            setPinInput("");
+          }
+        },
+        style: {
+          padding: "10px 30px",
+          borderRadius: 8,
+          border: "none",
+          background: "#212529",
+          color: "#fff",
+          fontSize: 14,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      }, "Entsperren"), /*#__PURE__*/React.createElement("div", {
+        style: {
+          marginTop: 16,
+          fontSize: 11,
+          color: "#ced4da"
+        }
+      }, "Nur die Praxisleitung kann den Plan bearbeiten."));
+    } else {
+      // No PIN set yet - unlock and show PIN setup hint
+      setIsUnlocked(true);
+      saveData("praxis-unlocked", true);
+    }
+  }
   const prevWeek = () => {
     const d = new Date(weekStart);
     d.setDate(d.getDate() - 7);
@@ -3778,7 +4328,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v1.1"))), /*#__PURE__*/React.createElement("div", {
+  }, "v1.2"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -4298,7 +4848,14 @@ function Schichtplaner() {
         fontWeight: 600
       }
     }, "Sonderzeiten aktiv: ", ph.from, " - ", ph.to);
-  })(), /*#__PURE__*/React.createElement(StationGrid, {
+  })(), isMobile ? /*#__PURE__*/React.createElement(MobileStationView, {
+    day: activeDay,
+    assignments: assignments,
+    staffList: staffList,
+    onCellClick: handleCellClick,
+    vacations: vacations,
+    wsStr: wsStr
+  }) : /*#__PURE__*/React.createElement(StationGrid, {
     day: activeDay,
     assignments: assignments,
     conflicts: conflicts,
@@ -4715,7 +5272,164 @@ function Schichtplaner() {
         fontWeight: 500
       }
     }, "✎ Bearbeiten")));
-  })))), shiftModal && /*#__PURE__*/React.createElement("div", {
+  }))), !editingAv && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 20,
+      padding: 16,
+      borderRadius: 10,
+      border: "1px solid #e9ecef",
+      background: "#f8f9fa"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 10,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
+    }
+  }, "Einstellungen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#6c757d",
+      marginBottom: 4
+    }
+  }, "PIN-Schutz (nur Praxisleitung kann bearbeiten)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "pin-input",
+    type: "text",
+    defaultValue: loadData("praxis-pin", ""),
+    placeholder: "PIN festlegen",
+    style: {
+      padding: "5px 10px",
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 13,
+      width: 120,
+      letterSpacing: 4
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var pin = document.getElementById("pin-input").value;
+      saveData("praxis-pin", pin);
+      alert(pin ? "PIN gesetzt. Beim n\\u00e4chsten \\u00d6ffnen wird die PIN abgefragt." : "PIN entfernt.");
+    },
+    style: {
+      padding: "5px 14px",
+      borderRadius: 5,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Speichern"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      saveData("praxis-unlocked", false);
+      setIsUnlocked(false);
+    },
+    style: {
+      padding: "5px 14px",
+      borderRadius: 5,
+      border: "1px solid #e03131",
+      background: "#fff",
+      color: "#e03131",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Sperren"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#6c757d",
+      marginBottom: 4
+    }
+  }, "Urlaubsantrags-Links (zum Teilen mit dem Team)"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#868e96",
+      marginBottom: 8
+    }
+  }, "Jede Person bekommt einen eigenen Link. Dort kann sie Urlaub beantragen, der per WhatsApp an die Praxisleitung geht."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 3
+    }
+  }, staffList.map(function (s) {
+    var reqData = {
+      n: s.name,
+      p: ""
+    };
+    var link = window.location.origin + window.location.pathname + "#request=" + LZString.compressToEncodedURIComponent(JSON.stringify(reqData));
+    return /*#__PURE__*/React.createElement("div", {
+      key: s.id,
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "4px 8px",
+        borderRadius: 5,
+        background: "#fff",
+        border: "1px solid #e9ecef"
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        background: s.color,
+        flexShrink: 0
+      }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 600,
+        color: s.color,
+        minWidth: 70
+      }
+    }, s.name), /*#__PURE__*/React.createElement("input", {
+      readOnly: true,
+      value: link,
+      style: {
+        flex: 1,
+        padding: "3px 6px",
+        border: "1px solid #e9ecef",
+        borderRadius: 4,
+        fontSize: 9,
+        color: "#868e96",
+        background: "#f8f9fa"
+      }
+    }), /*#__PURE__*/React.createElement("button", {
+      onClick: function () {
+        navigator.clipboard.writeText(link);
+      },
+      style: {
+        padding: "3px 8px",
+        borderRadius: 4,
+        border: "1px solid #dee2e6",
+        background: "#fff",
+        color: "#495057",
+        fontSize: 10,
+        fontWeight: 600,
+        cursor: "pointer",
+        whiteSpace: "nowrap"
+      }
+    }, "Kopieren"));
+  }))))), shiftModal && /*#__PURE__*/React.createElement("div", {
     onClick: () => setShiftModal(null),
     style: {
       position: "fixed",
