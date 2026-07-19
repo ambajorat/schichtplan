@@ -862,7 +862,8 @@ function StationGrid({
   violations,
   onCellClick,
   selectedStaff,
-  staffList
+  staffList,
+  clickState
 }) {
   const dynSlots = getDynSlots(assignments, day);
   return /*#__PURE__*/React.createElement("div", {
@@ -931,6 +932,7 @@ function StationGrid({
     const isCon = conflicts.has(key),
       isVio = violations.has(key);
     const selColor = selectedStaff ? (_staffList$find = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find === void 0 ? void 0 : _staffList$find.color : null;
+    const isInRange = clickState && clickState.day === day && clickState.station === st.id && slot.start >= clickState.time;
     return /*#__PURE__*/React.createElement("td", {
       key: `${st.id}-${idx}`,
       onClick: () => onCellClick(key),
@@ -941,7 +943,7 @@ function StationGrid({
         minWidth: 52,
         height: 21,
         cursor: "pointer",
-        background: isCon ? "#fff0f0" : isVio ? "#fff8e1" : selectedStaff && assigned.includes(selectedStaff) ? selColor + "15" : "transparent"
+        background: isCon ? "#fff0f0" : isVio ? "#fff8e1" : isInRange && selColor ? selColor + "18" : selectedStaff && assigned.includes(selectedStaff) ? selColor + "15" : "transparent"
       }
     }, /*#__PURE__*/React.createElement("div", {
       style: {
@@ -1754,6 +1756,7 @@ function ShareModal({
   }, "Alle per WhatsApp senden")));
 }
 function Schichtplaner() {
+  var _staffList$find2, _staffList$find3, _STATIONS$find;
   const [loaded, setLoaded] = useState(false);
   const [staffList, setStaffList] = useState(DEFAULT_STAFF);
   const [assignments, setAssignments] = useState({});
@@ -1773,6 +1776,8 @@ function Schichtplaner() {
   const [shiftStation, setShiftStation] = useState("empfang");
   const [shiftFrom, setShiftFrom] = useState("08:00");
   const [shiftTo, setShiftTo] = useState("14:00");
+  const [clickState, setClickState] = useState(null); // null | {day,station,time} = waiting for 2nd click
+
   useEffect(() => {
     setShiftDay(activeDay);
   }, [activeDay]);
@@ -1842,17 +1847,64 @@ function Schichtplaner() {
       station = p[1],
       time = p[3];
     if (selectedStaff) {
-      setShiftStaff(selectedStaff);
-      setShiftDay(day);
-      setShiftStation(station);
-      setShiftFrom(time);
-      const fm = timeToMin(time),
-        tm = fm + 360,
-        eH = Math.min(Math.floor(tm / 60), 20),
-        eM = tm % 60;
-      setShiftTo(`${String(eH).padStart(2, "0")}:${String(eM).padStart(2, "0")}`);
-    } else setEditingCell(key);
-  }, [selectedStaff]);
+      if (!clickState) {
+        // First click: set start
+        setClickState({
+          day,
+          station,
+          time
+        });
+        setShiftDay(day);
+        setShiftStation(station);
+        setShiftFrom(time);
+        setShiftTo(addEnd(time));
+        setActiveDay(day);
+      } else {
+        // Second click
+        if (clickState.day === day && clickState.station === station) {
+          // Same station: set end time
+          const t1 = timeToMin(clickState.time),
+            t2 = timeToMin(time);
+          const fromT = Math.min(t1, t2),
+            toT = Math.max(t1, t2) + 30;
+          const fH = Math.floor(fromT / 60),
+            fM = fromT % 60,
+            tH = Math.floor(toT / 60),
+            tM = toT % 60;
+          const from = `${String(fH).padStart(2, "0")}:${String(fM).padStart(2, "0")}`;
+          const to = `${String(tH).padStart(2, "0")}:${String(tM).padStart(2, "0")}`;
+          setShiftFrom(from);
+          setShiftTo(to);
+          // Auto-add the shift
+          setAssignments(prev => {
+            const n = {
+              ...prev
+            };
+            const slot = findFreeSlot(n, day, station, from, to);
+            TIME_SLOTS.filter(s => s.start >= from && s.start < to).forEach(sl => {
+              n[`${day}-${station}-${slot}-${sl.start}`] = [selectedStaff];
+            });
+            return n;
+          });
+          setClickState(null);
+        } else {
+          // Different station or day: restart with new first click
+          setClickState({
+            day,
+            station,
+            time
+          });
+          setShiftDay(day);
+          setShiftStation(station);
+          setShiftFrom(time);
+          setShiftTo(addEnd(time));
+          setActiveDay(day);
+        }
+      }
+    } else {
+      setEditingCell(key);
+    }
+  }, [selectedStaff, clickState]);
   const removeFromCell = useCallback((ck, sid) => {
     setAssignments(prev => {
       const n = {
@@ -2172,6 +2224,7 @@ function Schichtplaner() {
     onChange: e => {
       setShiftStaff(e.target.value);
       setSelectedStaff(e.target.value || null);
+      setClickState(null);
     },
     style: {
       padding: "5px 8px",
@@ -2299,14 +2352,50 @@ function Schichtplaner() {
       cursor: "pointer",
       height: 30
     }
-  }, "Tag löschen")), /*#__PURE__*/React.createElement(StationGrid, {
+  }, "Tag löschen"), clickState && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setClickState(null),
+    style: {
+      padding: "6px 14px",
+      borderRadius: 6,
+      border: "1px solid #868e96",
+      background: "#fff",
+      color: "#868e96",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      height: 30
+    }
+  }, "✕ Abbrechen")), shiftStaff && !clickState && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 6,
+      padding: "5px 10px",
+      background: "#f0f7ff",
+      borderRadius: 5,
+      fontSize: 10.5,
+      color: "#4A90D9",
+      fontWeight: 500
+    },
+    className: "no-print"
+  }, "Klicke eine Zelle als Startpunkt, dann eine zweite in derselben Station als Endpunkt — die Schicht wird automatisch eingetragen."), clickState && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 6,
+      padding: "5px 10px",
+      background: (((_staffList$find2 = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find2 === void 0 ? void 0 : _staffList$find2.color) || "#4A90D9") + "15",
+      borderRadius: 5,
+      fontSize: 10.5,
+      color: ((_staffList$find3 = staffList.find(x => x.id === selectedStaff)) === null || _staffList$find3 === void 0 ? void 0 : _staffList$find3.color) || "#4A90D9",
+      fontWeight: 600
+    },
+    className: "no-print"
+  }, "Start: ", (_STATIONS$find = STATIONS.find(s => s.id === clickState.station)) === null || _STATIONS$find === void 0 ? void 0 : _STATIONS$find.label, " ab ", clickState.time, " — jetzt Endzelle klicken"), /*#__PURE__*/React.createElement(StationGrid, {
     day: activeDay,
     assignments: assignments,
     conflicts: conflicts,
     violations: violations,
     onCellClick: handleCellClick,
     selectedStaff: selectedStaff,
-    staffList: staffList
+    staffList: staffList,
+    clickState: clickState
   }), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
@@ -2535,9 +2624,9 @@ function Schichtplaner() {
       color: "#868e96",
       marginBottom: 8
     }
-  }, (_STATIONS$find => {
+  }, (_STATIONS$find2 => {
     const p = editingCell.split("-");
-    return `${DAYS[p[0]]} · ${((_STATIONS$find = STATIONS.find(s => s.id === p[1])) === null || _STATIONS$find === void 0 ? void 0 : _STATIONS$find.label) || p[1]} · ${p[3]}`;
+    return `${DAYS[p[0]]} · ${((_STATIONS$find2 = STATIONS.find(s => s.id === p[1])) === null || _STATIONS$find2 === void 0 ? void 0 : _STATIONS$find2.label) || p[1]} · ${p[3]}`;
   })()), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10
