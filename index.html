@@ -107,6 +107,7 @@ function weekKey(d) {
 var _fbDb = null;
 var _fbReady = false;
 var _fbListeners = {};
+var _tenantId = localStorage.getItem("praxis-tenant-id") || "";
 function initFirebase() {
   var cfg = {
     apiKey: "AIzaSyBm-qChuiZXR6PObrgCzSON3Wbvk3sllxY",
@@ -126,24 +127,170 @@ function initFirebase() {
     return false;
   }
 }
+function fbPath() {
+  return _tenantId ? "tenants/" + _tenantId + "/" : "praxis/";
+}
 function fbKey(k) {
   return k.replace(/[.#$\[\]]/g, "_");
 }
 function fbSave(k, v) {
-  if (!_fbReady) return;
+  if (!_fbReady || !_tenantId) return;
   try {
-    _fbDb.ref("praxis/" + fbKey(k)).set(v);
+    _fbDb.ref(fbPath() + fbKey(k)).set(v);
   } catch (e) {}
 }
 function fbListen(k, cb) {
-  if (!_fbReady) return;
-  var ref = _fbDb.ref("praxis/" + fbKey(k));
+  if (!_fbReady || !_tenantId) return;
+  var ref = _fbDb.ref(fbPath() + fbKey(k));
   if (_fbListeners[k]) ref.off("value", _fbListeners[k]);
   _fbListeners[k] = ref.on("value", function (snap) {
     if (snap.exists()) cb(snap.val());
   });
 }
+function generateTenantId() {
+  var c = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  var id = "";
+  for (var i = 0; i < 8; i++) id += c.charAt(Math.floor(Math.random() * c.length));
+  return id;
+}
 initFirebase();
+function TenantSetup() {
+  var [code, setCode] = React.useState("");
+  var [mode, setMode] = React.useState(null);
+  return React.createElement("div", {
+    style: {
+      fontFamily: "system-ui,sans-serif",
+      maxWidth: 440,
+      margin: "0 auto",
+      padding: 40,
+      textAlign: "center",
+      minHeight: "100vh",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center"
+    }
+  }, React.createElement("div", {
+    style: {
+      display: "inline-block",
+      padding: "6px 16px",
+      borderRadius: 20,
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 700,
+      letterSpacing: 1,
+      textTransform: "uppercase",
+      marginBottom: 16
+    }
+  }, "statt-Tipex"), React.createElement("h2", {
+    style: {
+      fontSize: 20,
+      fontWeight: 800,
+      marginBottom: 8
+    }
+  }, "Willkommen"), React.createElement("p", {
+    style: {
+      fontSize: 13,
+      color: "#6c757d",
+      marginBottom: 24
+    }
+  }, "Schichtplaner fuer Zahnarztpraxen"), !mode && React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 10,
+      width: "100%"
+    }
+  }, React.createElement("button", {
+    onClick: function () {
+      var id = generateTenantId();
+      localStorage.setItem("praxis-tenant-id", id);
+      _tenantId = id;
+      window.location.reload();
+    },
+    style: {
+      padding: "14px 20px",
+      borderRadius: 10,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "Neue Praxis anlegen"), React.createElement("button", {
+    onClick: function () {
+      setMode("join");
+    },
+    style: {
+      padding: "14px 20px",
+      borderRadius: 10,
+      border: "2px solid #212529",
+      background: "#fff",
+      color: "#212529",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "Praxis-Code eingeben")), mode === "join" && React.createElement("div", {
+    style: {
+      width: "100%"
+    }
+  }, React.createElement("input", {
+    type: "text",
+    value: code,
+    onChange: function (e) {
+      setCode(e.target.value.toUpperCase());
+    },
+    placeholder: "z.B. AB12CD34",
+    maxLength: 8,
+    style: {
+      padding: "14px 20px",
+      border: "2px solid #dee2e6",
+      borderRadius: 10,
+      fontSize: 20,
+      textAlign: "center",
+      width: "100%",
+      letterSpacing: 6,
+      fontWeight: 700,
+      boxSizing: "border-box",
+      marginBottom: 10
+    }
+  }), React.createElement("button", {
+    onClick: function () {
+      if (code.length < 4) return;
+      localStorage.setItem("praxis-tenant-id", code);
+      _tenantId = code;
+      window.location.reload();
+    },
+    disabled: code.length < 4,
+    style: {
+      padding: "14px 20px",
+      borderRadius: 10,
+      border: "none",
+      background: code.length >= 4 ? "#212529" : "#dee2e6",
+      color: code.length >= 4 ? "#fff" : "#868e96",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: code.length >= 4 ? "pointer" : "default",
+      width: "100%"
+    }
+  }, "Verbinden"), React.createElement("button", {
+    onClick: function () {
+      setMode(null);
+    },
+    style: {
+      marginTop: 8,
+      padding: "8px",
+      background: "none",
+      border: "none",
+      color: "#868e96",
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "Zurueck")));
+}
 function loadData(k, fb) {
   try {
     var r = localStorage.getItem(k);
@@ -4411,6 +4558,9 @@ function Schichtplaner() {
     data: roRequest
   });
 
+  // Tenant check
+  if (!_tenantId) return /*#__PURE__*/React.createElement(TenantSetup, null);
+
   // PIN lock
   var storedPin = loadData("praxis-pin", "");
   if (!isUnlocked && storedPin) {
@@ -4582,7 +4732,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v4.1"))), /*#__PURE__*/React.createElement("div", {
+  }, "v5.0"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -5595,7 +5745,7 @@ function Schichtplaner() {
       var count = 0;
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
-        if (k.startsWith("praxis") && k !== "praxis-unlocked") {
+        if (k.startsWith("praxis") && k !== "praxis-unlocked" && k !== "praxis-tenant-id") {
           try {
             fbSave(k, JSON.parse(localStorage.getItem(k)));
             count++;
@@ -5621,7 +5771,71 @@ function Schichtplaner() {
       color: "#868e96",
       marginTop: 2
     }
-  }, _fbReady ? "Alle Geraete synchronisieren automatisch." : "Firebase nicht erreichbar."))), /*#__PURE__*/React.createElement("div", {
+  }, "Alle Geraete synchronisieren automatisch.")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      marginTop: 8,
+      padding: "8px 12px",
+      background: "#fff",
+      borderRadius: 6,
+      border: "1px solid #e9ecef"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#6c757d"
+    }
+  }, "Praxis-Code:"), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 14,
+      fontWeight: 800,
+      letterSpacing: 3,
+      color: "#212529",
+      fontFamily: "monospace"
+    }
+  }, _tenantId), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      navigator.clipboard.writeText(_tenantId);
+      alert("Code kopiert: " + _tenantId);
+    },
+    style: {
+      padding: "3px 8px",
+      borderRadius: 4,
+      border: "1px solid #dee2e6",
+      background: "#fff",
+      color: "#495057",
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer",
+      marginLeft: "auto"
+    }
+  }, "Kopieren")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 9,
+      color: "#868e96",
+      marginTop: 4
+    }
+  }, "Diesen Code an Kolleginnen weitergeben — damit verbinden sie sich mit dieser Praxis."), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (confirm("Praxis-Verbindung trennen? Du kannst dich mit dem Code jederzeit neu verbinden.")) {
+        localStorage.removeItem("praxis-tenant-id");
+        window.location.reload();
+      }
+    },
+    style: {
+      marginTop: 6,
+      padding: "4px 10px",
+      borderRadius: 5,
+      border: "1px solid #e03131",
+      background: "#fff",
+      color: "#e03131",
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Praxis wechseln")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
