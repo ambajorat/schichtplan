@@ -4938,7 +4938,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v6.2"), _tenantId && /*#__PURE__*/React.createElement("span", {
+  }, "v6.3"), _tenantId && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: 6,
       padding: "1px 6px",
@@ -5016,7 +5016,7 @@ function Schichtplaner() {
       borderBottom: "2px solid #e9ecef"
     },
     className: "no-print"
-  }, [["plan", "Schichtplan"], ["vacation", "Urlaub & Abwesenheit"], ["team", "Team & Verfügbarkeit"]].map(([k, label]) => {
+  }, [["plan", "Schichtplan"], ["vacation", "Urlaub & Abwesenheit"], ["team", "Team"], ["settings", "Einstellungen"]].map(([k, label]) => {
     var pendingCount = k === "vacation" ? vacRequests.filter(function (r) {
       return r.status === "pending";
     }).length : 0;
@@ -5956,9 +5956,8 @@ function Schichtplaner() {
         fontWeight: 500
       }
     }, "✎ Bearbeiten")));
-  }))), !editingAv && /*#__PURE__*/React.createElement("div", {
+  })))), tab === "settings" && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      marginTop: 20,
       padding: 16,
       borderRadius: 10,
       border: "1px solid #e9ecef",
@@ -5966,23 +5965,29 @@ function Schichtplaner() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       fontSize: 12,
       fontWeight: 700,
       color: "#212529",
-      marginBottom: 10,
+      marginBottom: 8,
       textTransform: "uppercase",
       letterSpacing: 0.5
     }
-  }, "Einstellungen"), /*#__PURE__*/React.createElement("div", {
+  }, "Stationen"), /*#__PURE__*/React.createElement(StationEditor, null)), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#6c757d",
-      marginBottom: 4
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
     }
   }, "Cloud-Sync"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6081,31 +6086,22 @@ function Schichtplaner() {
       color: "#868e96",
       marginTop: 4
     }
-  }, "Diesen Code an Kolleginnen weitergeben — damit verbinden sie sich mit dieser Praxis."), /*#__PURE__*/React.createElement("div", {
+  }, "Diesen Code an Kolleginnen weitergeben."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
-      marginTop: 6,
-      alignItems: "center"
+      marginTop: 6
     }
   }, /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       var newCode = prompt("Neuen Praxis-Code eingeben (mind. 3 Zeichen):");
       if (!newCode || newCode.length < 3) return;
       newCode = newCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
-      if (newCode.length < 3) {
-        alert("Code zu kurz.");
-        return;
-      }
-      if (!confirm("Code aendern zu " + newCode + "? Alle Geraete muessen den neuen Code verwenden.")) {
-        return;
-      }
-      // Copy data from old path to new path in Firebase
+      if (newCode.length < 3) return;
+      if (!confirm("Code aendern zu " + newCode + "?")) return;
       if (_fbReady && _fbDb) {
         _fbDb.ref(fbPath()).once("value").then(function (snap) {
-          if (snap.exists()) {
-            _fbDb.ref("tenants/" + newCode + "/").set(snap.val());
-          }
+          if (snap.exists()) _fbDb.ref("tenants/" + newCode + "/").set(snap.val());
           localStorage.setItem("praxis-tenant-id", newCode);
           _tenantId = newCode;
           window.location.reload();
@@ -6147,16 +6143,14 @@ function Schichtplaner() {
     style: {
       marginBottom: 14
     }
-  }, /*#__PURE__*/React.createElement(StationEditor, null)), /*#__PURE__*/React.createElement("div", {
-    style: {
-      marginBottom: 14
-    }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#6c757d",
-      marginBottom: 4
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
     }
   }, "Backup"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6236,10 +6230,12 @@ function Schichtplaner() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#6c757d",
-      marginBottom: 4
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
     }
   }, "PIN-Schutz"), /*#__PURE__*/React.createElement("div", {
     style: {
@@ -6293,10 +6289,12 @@ function Schichtplaner() {
     }
   }, "Sperren"))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
-      fontSize: 11,
-      fontWeight: 600,
-      color: "#6c757d",
-      marginBottom: 4
+      fontSize: 12,
+      fontWeight: 700,
+      color: "#212529",
+      marginBottom: 8,
+      textTransform: "uppercase",
+      letterSpacing: 0.5
     }
   }, "Urlaubsantrags-Links"), /*#__PURE__*/React.createElement("div", {
     style: {
