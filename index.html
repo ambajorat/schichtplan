@@ -4422,10 +4422,49 @@ function Schichtplaner() {
       if (_tenantId === "DEMO" && (!st || st.length === 0)) {
         setStaffList(DEMO_STAFF);
         saveData("praxis-staff", DEMO_STAFF);
-        // Set sensible station requirements for demo
-        var demoReqs = {};
+        // Demo vacations
+        var today = new Date();
+        var y = today.getFullYear();
+        var m = String(today.getMonth() + 1).padStart(2, "0");
+        var demoVac = [{
+          id: "dv1",
+          staffId: "anna",
+          from: y + "-" + m + "-" + String(Math.min(today.getDate() + 2, 28)).padStart(2, "0"),
+          to: y + "-" + m + "-" + String(Math.min(today.getDate() + 6, 28)).padStart(2, "0"),
+          note: "Urlaub"
+        }, {
+          id: "dv2",
+          staffId: "sarah",
+          from: fmtDate(today),
+          to: fmtDate(today),
+          note: "Krank"
+        }, {
+          id: "dv3",
+          staffId: "lena",
+          from: y + "-" + m + "-" + String(Math.min(today.getDate() + 3, 28)).padStart(2, "0"),
+          to: y + "-" + m + "-" + String(Math.min(today.getDate() + 4, 28)).padStart(2, "0"),
+          note: "Fortbildung"
+        }];
+        setVacations(demoVac);
+        saveData("praxis-vacations", demoVac);
+        // Demo requests (pending)
+        var demoReqs = [{
+          id: "dr1",
+          staffId: "nina",
+          from: y + "-" + m + "-" + String(Math.min(today.getDate() + 14, 28)).padStart(2, "0"),
+          to: y + "-" + m + "-" + String(Math.min(today.getDate() + 18, 28)).padStart(2, "0"),
+          note: "Urlaub",
+          comment: "Familienfeier",
+          status: "pending",
+          created: fmtDate(today),
+          days: 5
+        }];
+        setVacRequests(demoReqs);
+        saveData("praxis-requests", demoReqs);
+        // Station requirements
+        var demoStReqs = {};
         STATIONS.forEach(function (s) {
-          demoReqs[s.id] = {
+          demoStReqs[s.id] = {
             arzt: 0,
             zfa: 0,
             znp: 0,
@@ -4433,57 +4472,75 @@ function Schichtplaner() {
             azubi: 0
           };
         });
-        demoReqs["empfang"] = {
+        demoStReqs["empfang"] = {
           arzt: 0,
           zfa: 1,
           znp: 0,
           zmv: 0,
           azubi: 0
         };
-        demoReqs["buero"] = {
+        demoStReqs["buero"] = {
           arzt: 0,
           zfa: 0,
           znp: 0,
           zmv: 1,
           azubi: 0
         };
-        demoReqs["zi1"] = {
+        demoStReqs["zi1"] = {
           arzt: 1,
           zfa: 1,
           znp: 0,
           zmv: 0,
           azubi: 0
         };
-        demoReqs["zi2"] = {
+        demoStReqs["zi2"] = {
           arzt: 1,
           zfa: 1,
           znp: 0,
           zmv: 0,
           azubi: 0
         };
-        demoReqs["zi3"] = {
+        demoStReqs["zi3"] = {
           arzt: 1,
           zfa: 1,
           znp: 0,
           zmv: 0,
           azubi: 0
         };
-        demoReqs["zi4"] = {
+        demoStReqs["zi4"] = {
           arzt: 1,
           zfa: 1,
           znp: 0,
           zmv: 0,
           azubi: 0
         };
-        demoReqs["steri"] = {
+        demoStReqs["steri"] = {
           arzt: 0,
           zfa: 1,
           znp: 0,
           zmv: 0,
           azubi: 0
         };
-        setStationReqs(demoReqs);
-        saveData("praxis-station-reqs", demoReqs);
+        setStationReqs(demoStReqs);
+        saveData("praxis-station-reqs", demoStReqs);
+        // Auto-generate schedule for current week
+        var cfg = STATIONS.map(function (s) {
+          var reqs = [];
+          ["arzt", "zfa", "znp", "zmv", "azubi"].forEach(function (r) {
+            var n = demoStReqs[s.id] && demoStReqs[s.id][r] || 0;
+            if (n > 0) reqs.push({
+              role: r,
+              min: n
+            });
+          });
+          return {
+            id: s.id,
+            reqs: reqs
+          };
+        });
+        var proposed = autoSchedule(DEMO_STAFF, demoVac, fmtDate(getMonday(today)), cfg, []);
+        setAssignments(proposed);
+        saveData("praxis-" + weekKey(getMonday(today)), proposed);
       }
 
       // Firebase real-time listeners
@@ -4716,7 +4773,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v6.0"), _tenantId && /*#__PURE__*/React.createElement("span", {
+  }, "v6.1"), _tenantId && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: 6,
       padding: "1px 6px",
