@@ -230,7 +230,31 @@ function TenantSetup() {
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "Praxis-Code eingeben")), mode === "create" && React.createElement("div", {
+  }, "Praxis-Code eingeben"), React.createElement("button", {
+    onClick: function () {
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.startsWith("praxis") && k !== "praxis-tenant-id") keysToRemove.push(k);
+      }
+      keysToRemove.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+      localStorage.setItem("praxis-tenant-id", "DEMO");
+      _tenantId = "DEMO";
+      window.location.reload();
+    },
+    style: {
+      padding: "14px 20px",
+      borderRadius: 10,
+      border: "2px solid #2e7d32",
+      background: "#fff",
+      color: "#2e7d32",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer"
+    }
+  }, "Demo ausprobieren")), mode === "create" && React.createElement("div", {
     style: {
       width: "100%"
     }
@@ -309,10 +333,10 @@ function TenantSetup() {
     type: "text",
     value: code,
     onChange: function (e) {
-      setCode(e.target.value.toUpperCase());
+      setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
     },
-    placeholder: "z.B. AB12CD34",
-    maxLength: 8,
+    placeholder: "z.B. MEINEPRAXIS",
+    maxLength: 20,
     style: {
       padding: "14px 20px",
       border: "2px solid #dee2e6",
@@ -320,33 +344,42 @@ function TenantSetup() {
       fontSize: 20,
       textAlign: "center",
       width: "100%",
-      letterSpacing: 6,
+      letterSpacing: 4,
       fontWeight: 700,
       boxSizing: "border-box",
       marginBottom: 10
     }
   }), React.createElement("button", {
     onClick: function () {
-      if (code.length < 4) return;
+      if (code.length < 3) return;
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.startsWith("praxis") && k !== "praxis-tenant-id") keysToRemove.push(k);
+      }
+      keysToRemove.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
       localStorage.setItem("praxis-tenant-id", code);
       _tenantId = code;
       window.location.reload();
     },
-    disabled: code.length < 4,
+    disabled: code.length < 3,
     style: {
       padding: "14px 20px",
       borderRadius: 10,
       border: "none",
-      background: code.length >= 4 ? "#212529" : "#dee2e6",
-      color: code.length >= 4 ? "#fff" : "#868e96",
+      background: code.length >= 3 ? "#212529" : "#dee2e6",
+      color: code.length >= 3 ? "#fff" : "#868e96",
       fontSize: 15,
       fontWeight: 700,
-      cursor: code.length >= 4 ? "pointer" : "default",
+      cursor: code.length >= 3 ? "pointer" : "default",
       width: "100%"
     }
   }, "Verbinden"), React.createElement("button", {
     onClick: function () {
       setMode(null);
+      setCode("");
     },
     style: {
       marginTop: 8,
@@ -4683,7 +4716,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v5.8"), _tenantId && /*#__PURE__*/React.createElement("span", {
+  }, "v6.0"), _tenantId && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: 6,
       padding: "1px 6px",
