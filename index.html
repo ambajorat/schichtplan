@@ -13,6 +13,8 @@
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/lz-string/1.5.0/lz-string.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 </head>
 <body>
 <div id="root"></div>
@@ -101,9 +103,46 @@ function fmtDateDE(s) {
 function weekKey(d) {
   return `wk-${fmtDate(getMonday(d))}`;
 }
+// Firebase sync layer
+var _fbDb = null;
+var _fbReady = false;
+var _fbListeners = {};
+function initFirebase() {
+  var cfg = null;
+  try {
+    cfg = JSON.parse(localStorage.getItem("praxis-firebase-config"));
+  } catch (e) {}
+  if (!cfg) return false;
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    _fbDb = firebase.database();
+    _fbReady = true;
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+function fbKey(k) {
+  return k.replace(/[.#$\[\]]/g, "_");
+}
+function fbSave(k, v) {
+  if (!_fbReady) return;
+  try {
+    _fbDb.ref("praxis/" + fbKey(k)).set(v);
+  } catch (e) {}
+}
+function fbListen(k, cb) {
+  if (!_fbReady) return;
+  var ref = _fbDb.ref("praxis/" + fbKey(k));
+  if (_fbListeners[k]) ref.off("value", _fbListeners[k]);
+  _fbListeners[k] = ref.on("value", function (snap) {
+    if (snap.exists()) cb(snap.val());
+  });
+}
+initFirebase();
 function loadData(k, fb) {
   try {
-    const r = localStorage.getItem(k);
+    var r = localStorage.getItem(k);
     return r ? JSON.parse(r) : fb;
   } catch (e) {
     return fb;
@@ -113,6 +152,7 @@ function saveData(k, v) {
   try {
     localStorage.setItem(k, JSON.stringify(v));
   } catch (e) {}
+  fbSave(k, v);
 }
 function hasRole(staff, r) {
   var roles = staff.roles || staff.role;
@@ -4310,12 +4350,39 @@ function Schichtplaner() {
       setVacations(va);
       setAssignments(migrateAssignments(as || buildDefault()));
       setLoaded(true);
+
+      // Firebase real-time listeners
+      if (_fbReady) {
+        fbListen("praxis-staff", function (v) {
+          if (v) setStaffList(v);
+        });
+        fbListen("praxis-vacations", function (v) {
+          if (v) setVacations(v);
+        });
+        fbListen("praxis-hours", function (v) {
+          if (v) setPracticeHours(v);
+        });
+        fbListen("praxis-requests", function (v) {
+          if (v) setVacRequests(v);
+        });
+        fbListen("praxis-station-reqs", function (v) {
+          if (v) setStationReqs(v);
+        });
+      }
     })();
   }, []);
+
+  // Firebase listener for week-specific assignments
   useEffect(() => {
     if (!loaded) return;
-    const as = loadData(`praxis-${weekKey(weekStart)}`, null);
+    const wk = `praxis-${weekKey(weekStart)}`;
+    const as = loadData(wk, null);
     setAssignments(migrateAssignments(as || buildDefault()));
+    if (_fbReady) {
+      fbListen(wk, function (v) {
+        if (v) setAssignments(migrateAssignments(v));
+      });
+    }
   }, [weekStart, loaded]);
   useEffect(() => {
     if (!loaded) return;
@@ -4511,7 +4578,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v3.7"))), /*#__PURE__*/React.createElement("div", {
+  }, "v4.0"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -4677,6 +4744,22 @@ function Schichtplaner() {
       marginLeft: 4
     }
   }, "Woche kopieren"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (confirm("Alle Schichten dieser Woche l\u00f6schen?")) {
+        setAssignments({});
+      }
+    },
+    style: {
+      padding: "5px 10px",
+      borderRadius: 5,
+      border: "1px solid \#e03131",
+      background: "\#fff",
+      cursor: "pointer",
+      fontSize: 10,
+      fontWeight: 500,
+      color: "\#e03131"
+    }
+  }, "Leere Woche"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       setShowStationCfg(!showStationCfg);
     },
@@ -5478,6 +5561,132 @@ function Schichtplaner() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 11,
+      fontWeight: 600,
+      color: "#6c757d",
+      marginBottom: 4
+    }
+  }, "Cloud-Sync (mehrere Geräte)"), _fbReady ? /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: "#2e7d32"
+    }
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontSize: 11,
+      color: "#2e7d32",
+      fontWeight: 600
+    }
+  }, "Echtzeit-Sync aktiv"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var count = 0;
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.startsWith("praxis") && k !== "praxis-firebase-config" && k !== "praxis-unlocked") {
+          try {
+            fbSave(k, JSON.parse(localStorage.getItem(k)));
+            count++;
+          } catch (e) {}
+        }
+      }
+      alert(count + " Einstellungen hochgeladen.");
+    },
+    style: {
+      padding: "4px 10px",
+      borderRadius: 5,
+      border: "1px solid #2e7d32",
+      background: "#fff",
+      color: "#2e7d32",
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Alles hochladen"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      localStorage.removeItem("praxis-firebase-config");
+      window.location.reload();
+    },
+    style: {
+      padding: "4px 10px",
+      borderRadius: 5,
+      border: "1px solid #e03131",
+      background: "#fff",
+      color: "#e03131",
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Trennen"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      width: "100%",
+      fontSize: 9,
+      color: "#868e96",
+      marginTop: 2
+    }
+  }, "Alle Aenderungen werden automatisch synchronisiert.")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 10,
+      color: "#868e96",
+      marginBottom: 6
+    }
+  }, "Firebase-Config einfügen (aus der Firebase Console → Projekteinstellungen → Web-App):"), /*#__PURE__*/React.createElement("textarea", {
+    id: "fb-config",
+    rows: "4",
+    placeholder: "{\"apiKey\":\"...\",\"authDomain\":\"...\",\"databaseURL\":\"...\",\"projectId\":\"...\"}",
+    style: {
+      width: "100%",
+      padding: 8,
+      border: "1px solid #dee2e6",
+      borderRadius: 5,
+      fontSize: 10,
+      fontFamily: "monospace",
+      boxSizing: "border-box",
+      marginBottom: 6
+    }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var txt = document.getElementById("fb-config").value;
+      try {
+        var cfg = JSON.parse(txt);
+        if (!cfg.databaseURL) {
+          alert("databaseURL fehlt in der Config.");
+          return;
+        }
+        localStorage.setItem("praxis-firebase-config", JSON.stringify(cfg));
+        window.location.reload();
+      } catch (e) {
+        alert("Ungültiges JSON: " + e.message);
+      }
+    },
+    style: {
+      padding: "6px 14px",
+      borderRadius: 6,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 11,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Verbinden"))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginBottom: 14
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
       fontSize: 11,
       fontWeight: 600,
       color: "#6c757d",
@@ -5700,7 +5909,7 @@ function Schichtplaner() {
         whiteSpace: "nowrap"
       }
     }, "Kopieren"));
-  }))))), shiftModal && /*#__PURE__*/React.createElement("div", {
+  })))))), shiftModal && /*#__PURE__*/React.createElement("div", {
     onClick: () => setShiftModal(null),
     style: {
       position: "fixed",
