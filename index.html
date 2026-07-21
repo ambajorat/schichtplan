@@ -399,6 +399,277 @@ function getPracticeHoursForDay(practiceHours, weekStartStr, dayIdx) {
   return match;
 }
 const DEFAULT_STAFF = [];
+const DEMO_STAFF = [{
+  id: "dr-schmidt",
+  name: "Dr. Schmidt",
+  color: "#1565c0",
+  roles: ["arzt"],
+  rooms: ["zi1", "zi2"],
+  availability: {
+    0: {
+      from: "08:00",
+      to: "17:00"
+    },
+    1: {
+      from: "08:00",
+      to: "17:00"
+    },
+    2: {
+      from: "08:00",
+      to: "13:00"
+    },
+    3: {
+      from: "08:00",
+      to: "17:00"
+    },
+    4: {
+      from: "08:00",
+      to: "14:00"
+    }
+  },
+  maxHours: 38,
+  vacDays: 30
+}, {
+  id: "dr-weber",
+  name: "Dr. Weber",
+  color: "#6a1b9a",
+  roles: ["arzt"],
+  rooms: ["zi3", "zi4"],
+  availability: {
+    0: {
+      from: "09:00",
+      to: "18:00"
+    },
+    1: {
+      from: "08:00",
+      to: "16:00"
+    },
+    2: {
+      from: "09:00",
+      to: "18:00"
+    },
+    3: {
+      from: "09:00",
+      to: "18:00"
+    },
+    4: {
+      from: "08:00",
+      to: "13:00"
+    }
+  },
+  maxHours: 36,
+  vacDays: 30
+}, {
+  id: "lisa",
+  name: "Lisa",
+  color: "#e65100",
+  roles: ["zfa"],
+  rooms: ["empfang", "zi1", "zi2", "zi3", "zi4", "steri"],
+  availability: {
+    0: {
+      from: "07:30",
+      to: "16:00"
+    },
+    1: {
+      from: "07:30",
+      to: "16:00"
+    },
+    2: {
+      from: "07:30",
+      to: "14:00"
+    },
+    3: {
+      from: "07:30",
+      to: "16:00"
+    },
+    4: {
+      from: "07:30",
+      to: "14:00"
+    }
+  },
+  maxHours: 35,
+  vacDays: 28
+}, {
+  id: "sarah",
+  name: "Sarah",
+  color: "#2e7d32",
+  roles: ["zfa"],
+  rooms: ["empfang", "zi1", "zi2", "zi3", "zi4", "steri"],
+  availability: {
+    0: {
+      from: "10:00",
+      to: "19:00"
+    },
+    1: {
+      from: "07:30",
+      to: "16:00"
+    },
+    2: {
+      from: "10:00",
+      to: "19:00"
+    },
+    3: {
+      from: "10:00",
+      to: "19:00"
+    },
+    4: {
+      from: "07:30",
+      to: "14:00"
+    }
+  },
+  maxHours: 35,
+  vacDays: 28
+}, {
+  id: "marie",
+  name: "Marie",
+  color: "#c62828",
+  roles: ["zfa"],
+  rooms: ["empfang", "zi1", "zi2", "zi3", "zi4", "steri", "buero"],
+  availability: {
+    0: {
+      from: "07:30",
+      to: "14:30"
+    },
+    1: {
+      from: "12:00",
+      to: "20:00"
+    },
+    2: {
+      from: "07:30",
+      to: "14:30"
+    },
+    3: {
+      from: "12:00",
+      to: "20:00"
+    },
+    4: {
+      from: "07:30",
+      to: "14:00"
+    }
+  },
+  maxHours: 32,
+  vacDays: 26
+}, {
+  id: "anna",
+  name: "Anna",
+  color: "#00838f",
+  roles: ["znp"],
+  rooms: ["zi5", "zi6"],
+  availability: {
+    0: {
+      from: "08:00",
+      to: "17:00"
+    },
+    1: {
+      from: "08:00",
+      to: "17:00"
+    },
+    2: {
+      from: "08:00",
+      to: "13:00"
+    },
+    3: {
+      from: "08:00",
+      to: "17:00"
+    },
+    4: {
+      from: "08:00",
+      to: "14:00"
+    }
+  },
+  maxHours: 34,
+  vacDays: 28
+}, {
+  id: "julia",
+  name: "Julia",
+  color: "#4A90D9",
+  roles: ["zmv"],
+  rooms: ["buero", "empfang"],
+  availability: {
+    0: {
+      from: "08:00",
+      to: "16:00"
+    },
+    1: {
+      from: "08:00",
+      to: "16:00"
+    },
+    2: {
+      from: "08:00",
+      to: "13:00"
+    },
+    3: {
+      from: "08:00",
+      to: "16:00"
+    },
+    4: {
+      from: "08:00",
+      to: "14:00"
+    }
+  },
+  maxHours: 34,
+  vacDays: 26
+}, {
+  id: "lena",
+  name: "Lena",
+  color: "#ef6c00",
+  roles: ["zfa", "azubi"],
+  rooms: ["empfang", "zi1", "zi2", "zi3", "zi4", "steri"],
+  availability: {
+    0: {
+      from: "08:00",
+      to: "16:30"
+    },
+    1: {
+      from: "08:00",
+      to: "16:30"
+    },
+    2: {
+      from: "08:00",
+      to: "13:00"
+    },
+    3: {
+      from: "08:00",
+      to: "16:30"
+    },
+    4: {
+      from: "08:00",
+      to: "14:00"
+    }
+  },
+  maxHours: 30,
+  vacDays: 26
+}, {
+  id: "nina",
+  name: "Nina",
+  color: "#5c6bc0",
+  roles: ["zfa"],
+  rooms: ["empfang", "steri", "zi1", "zi2"],
+  availability: {
+    0: {
+      from: "12:00",
+      to: "20:00"
+    },
+    1: {
+      from: "07:30",
+      to: "14:30"
+    },
+    2: {
+      from: "12:00",
+      to: "20:00"
+    },
+    3: {
+      from: "07:30",
+      to: "14:30"
+    },
+    4: {
+      from: "07:30",
+      to: "14:00"
+    }
+  },
+  maxHours: 32,
+  vacDays: 26
+}];
 function buildDefault() {
   const a = {};
   const s = (d, st, si, f, t, ids) => {
@@ -4114,6 +4385,74 @@ function Schichtplaner() {
       setAssignments(migrateAssignments(as || buildDefault()));
       setLoaded(true);
 
+      // Seed demo data if tenant is DEMO and no staff exists
+      if (_tenantId === "DEMO" && (!st || st.length === 0)) {
+        setStaffList(DEMO_STAFF);
+        saveData("praxis-staff", DEMO_STAFF);
+        // Set sensible station requirements for demo
+        var demoReqs = {};
+        STATIONS.forEach(function (s) {
+          demoReqs[s.id] = {
+            arzt: 0,
+            zfa: 0,
+            znp: 0,
+            zmv: 0,
+            azubi: 0
+          };
+        });
+        demoReqs["empfang"] = {
+          arzt: 0,
+          zfa: 1,
+          znp: 0,
+          zmv: 0,
+          azubi: 0
+        };
+        demoReqs["buero"] = {
+          arzt: 0,
+          zfa: 0,
+          znp: 0,
+          zmv: 1,
+          azubi: 0
+        };
+        demoReqs["zi1"] = {
+          arzt: 1,
+          zfa: 1,
+          znp: 0,
+          zmv: 0,
+          azubi: 0
+        };
+        demoReqs["zi2"] = {
+          arzt: 1,
+          zfa: 1,
+          znp: 0,
+          zmv: 0,
+          azubi: 0
+        };
+        demoReqs["zi3"] = {
+          arzt: 1,
+          zfa: 1,
+          znp: 0,
+          zmv: 0,
+          azubi: 0
+        };
+        demoReqs["zi4"] = {
+          arzt: 1,
+          zfa: 1,
+          znp: 0,
+          zmv: 0,
+          azubi: 0
+        };
+        demoReqs["steri"] = {
+          arzt: 0,
+          zfa: 1,
+          znp: 0,
+          zmv: 0,
+          azubi: 0
+        };
+        setStationReqs(demoReqs);
+        saveData("praxis-station-reqs", demoReqs);
+      }
+
       // Firebase real-time listeners
       if (_fbReady) {
         fbListen("praxis-staff", function (v) {
@@ -4344,7 +4683,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v5.7"), _tenantId && /*#__PURE__*/React.createElement("span", {
+  }, "v5.8"), _tenantId && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: 6,
       padding: "1px 6px",
