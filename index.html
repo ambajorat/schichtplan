@@ -204,10 +204,7 @@ function TenantSetup() {
     }
   }, React.createElement("button", {
     onClick: function () {
-      var id = generateTenantId();
-      localStorage.setItem("praxis-tenant-id", id);
-      _tenantId = id;
-      window.location.reload();
+      setMode("create");
     },
     style: {
       padding: "14px 20px",
@@ -233,7 +230,78 @@ function TenantSetup() {
       fontWeight: 700,
       cursor: "pointer"
     }
-  }, "Praxis-Code eingeben")), mode === "join" && React.createElement("div", {
+  }, "Praxis-Code eingeben")), mode === "create" && React.createElement("div", {
+    style: {
+      width: "100%"
+    }
+  }, React.createElement("p", {
+    style: {
+      fontSize: 12,
+      color: "#6c757d",
+      marginBottom: 8
+    }
+  }, "Eigenen Code waehlen oder automatisch generieren:"), React.createElement("input", {
+    type: "text",
+    value: code,
+    onChange: function (e) {
+      setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+    },
+    placeholder: generateTenantId(),
+    maxLength: 16,
+    style: {
+      padding: "14px 20px",
+      border: "2px solid #dee2e6",
+      borderRadius: 10,
+      fontSize: 20,
+      textAlign: "center",
+      width: "100%",
+      letterSpacing: 4,
+      fontWeight: 700,
+      boxSizing: "border-box",
+      marginBottom: 10
+    }
+  }), React.createElement("button", {
+    onClick: function () {
+      var id = code.length >= 3 ? code : generateTenantId();
+      // Clear old practice data from localStorage
+      var keysToRemove = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k.startsWith("praxis") && k !== "praxis-tenant-id") keysToRemove.push(k);
+      }
+      keysToRemove.forEach(function (k) {
+        localStorage.removeItem(k);
+      });
+      localStorage.setItem("praxis-tenant-id", id);
+      _tenantId = id;
+      window.location.reload();
+    },
+    style: {
+      padding: "14px 20px",
+      borderRadius: 10,
+      border: "none",
+      background: "#212529",
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: 700,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, code.length >= 3 ? "Praxis \"" + code + "\" anlegen" : "Zufaelligen Code generieren"), React.createElement("button", {
+    onClick: function () {
+      setMode(null);
+      setCode("");
+    },
+    style: {
+      marginTop: 8,
+      padding: "8px",
+      background: "none",
+      border: "none",
+      color: "#868e96",
+      fontSize: 12,
+      cursor: "pointer"
+    }
+  }, "Zurueck")), mode === "join" && React.createElement("div", {
     style: {
       width: "100%"
     }
@@ -4732,7 +4800,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v5.0"))), /*#__PURE__*/React.createElement("div", {
+  }, "v5.2"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
