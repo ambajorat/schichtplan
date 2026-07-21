@@ -4800,7 +4800,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v5.2"))), /*#__PURE__*/React.createElement("div", {
+  }, "v5.4"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -5686,7 +5686,17 @@ function Schichtplaner() {
         fontWeight: 600,
         marginLeft: 4
       }
-    }, "Arzt"), hasRole(s, "znp") && /*#__PURE__*/React.createElement("span", {
+    }, "Arzt"), hasRole(s, "zfa") && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        padding: "1px 5px",
+        borderRadius: 3,
+        background: "#e8eaf6",
+        color: "#3949ab",
+        fontWeight: 600,
+        marginLeft: 4
+      }
+    }, "ZFA"), hasRole(s, "znp") && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         padding: "1px 5px",
@@ -5885,15 +5895,59 @@ function Schichtplaner() {
       color: "#868e96",
       marginTop: 4
     }
-  }, "Diesen Code an Kolleginnen weitergeben — damit verbinden sie sich mit dieser Praxis."), /*#__PURE__*/React.createElement("button", {
+  }, "Diesen Code an Kolleginnen weitergeben — damit verbinden sie sich mit dieser Praxis."), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 6,
+      marginTop: 6,
+      alignItems: "center"
+    }
+  }, /*#__PURE__*/React.createElement("button", {
     onClick: function () {
-      if (confirm("Praxis-Verbindung trennen? Du kannst dich mit dem Code jederzeit neu verbinden.")) {
+      var newCode = prompt("Neuen Praxis-Code eingeben (mind. 3 Zeichen):");
+      if (!newCode || newCode.length < 3) return;
+      newCode = newCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (newCode.length < 3) {
+        alert("Code zu kurz.");
+        return;
+      }
+      if (!confirm("Code aendern zu " + newCode + "? Alle Geraete muessen den neuen Code verwenden.")) {
+        return;
+      }
+      // Copy data from old path to new path in Firebase
+      if (_fbReady && _fbDb) {
+        _fbDb.ref(fbPath()).once("value").then(function (snap) {
+          if (snap.exists()) {
+            _fbDb.ref("tenants/" + newCode + "/").set(snap.val());
+          }
+          localStorage.setItem("praxis-tenant-id", newCode);
+          _tenantId = newCode;
+          window.location.reload();
+        });
+      } else {
+        localStorage.setItem("praxis-tenant-id", newCode);
+        _tenantId = newCode;
+        window.location.reload();
+      }
+    },
+    style: {
+      padding: "4px 10px",
+      borderRadius: 5,
+      border: "1px solid #4A90D9",
+      background: "#fff",
+      color: "#4A90D9",
+      fontSize: 10,
+      fontWeight: 600,
+      cursor: "pointer"
+    }
+  }, "Code aendern"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (confirm("Praxis-Verbindung trennen?")) {
         localStorage.removeItem("praxis-tenant-id");
         window.location.reload();
       }
     },
     style: {
-      marginTop: 6,
       padding: "4px 10px",
       borderRadius: 5,
       border: "1px solid #e03131",
@@ -5903,7 +5957,7 @@ function Schichtplaner() {
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "Praxis wechseln")), /*#__PURE__*/React.createElement("div", {
+  }, "Praxis wechseln"))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
