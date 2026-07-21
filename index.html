@@ -108,11 +108,15 @@ var _fbDb = null;
 var _fbReady = false;
 var _fbListeners = {};
 function initFirebase() {
-  var cfg = null;
-  try {
-    cfg = JSON.parse(localStorage.getItem("praxis-firebase-config"));
-  } catch (e) {}
-  if (!cfg) return false;
+  var cfg = {
+    apiKey: "AIzaSyBm-qChuiZXR6PObrgCzSON3Wbvk3sllxY",
+    authDomain: "statt-tipex.firebaseapp.com",
+    databaseURL: "https://statt-tipex-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "statt-tipex",
+    storageBucket: "statt-tipex.firebasestorage.app",
+    messagingSenderId: "859810664903",
+    appId: "1:859810664903:web:4cf49a94c1e76bd9e689e2"
+  };
   try {
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     _fbDb = firebase.database();
@@ -4578,7 +4582,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v4.0"))), /*#__PURE__*/React.createElement("div", {
+  }, "v4.1"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 4,
@@ -5561,16 +5565,12 @@ function Schichtplaner() {
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      marginBottom: 14
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
       fontSize: 11,
       fontWeight: 600,
       color: "#6c757d",
       marginBottom: 4
     }
-  }, "Cloud-Sync (mehrere Geräte)"), _fbReady ? /*#__PURE__*/React.createElement("div", {
+  }, "Cloud-Sync"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       alignItems: "center",
@@ -5582,27 +5582,27 @@ function Schichtplaner() {
       width: 8,
       height: 8,
       borderRadius: "50%",
-      background: "#2e7d32"
+      background: _fbReady ? "#2e7d32" : "#e03131"
     }
   }), /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 11,
-      color: "#2e7d32",
+      color: _fbReady ? "#2e7d32" : "#e03131",
       fontWeight: 600
     }
-  }, "Echtzeit-Sync aktiv"), /*#__PURE__*/React.createElement("button", {
+  }, _fbReady ? "Echtzeit-Sync aktiv" : "Nicht verbunden"), _fbReady && /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       var count = 0;
       for (var i = 0; i < localStorage.length; i++) {
         var k = localStorage.key(i);
-        if (k.startsWith("praxis") && k !== "praxis-firebase-config" && k !== "praxis-unlocked") {
+        if (k.startsWith("praxis") && k !== "praxis-unlocked") {
           try {
             fbSave(k, JSON.parse(localStorage.getItem(k)));
             count++;
           } catch (e) {}
         }
       }
-      alert(count + " Einstellungen hochgeladen.");
+      alert(count + " hochgeladen.");
     },
     style: {
       padding: "4px 10px",
@@ -5614,74 +5614,14 @@ function Schichtplaner() {
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "Alles hochladen"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      localStorage.removeItem("praxis-firebase-config");
-      window.location.reload();
-    },
-    style: {
-      padding: "4px 10px",
-      borderRadius: 5,
-      border: "1px solid #e03131",
-      background: "#fff",
-      color: "#e03131",
-      fontSize: 10,
-      fontWeight: 600,
-      cursor: "pointer"
-    }
-  }, "Trennen"), /*#__PURE__*/React.createElement("div", {
+  }, "Alles hochladen"), /*#__PURE__*/React.createElement("div", {
     style: {
       width: "100%",
       fontSize: 9,
       color: "#868e96",
       marginTop: 2
     }
-  }, "Alle Aenderungen werden automatisch synchronisiert.")) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    style: {
-      fontSize: 10,
-      color: "#868e96",
-      marginBottom: 6
-    }
-  }, "Firebase-Config einfügen (aus der Firebase Console → Projekteinstellungen → Web-App):"), /*#__PURE__*/React.createElement("textarea", {
-    id: "fb-config",
-    rows: "4",
-    placeholder: "{\"apiKey\":\"...\",\"authDomain\":\"...\",\"databaseURL\":\"...\",\"projectId\":\"...\"}",
-    style: {
-      width: "100%",
-      padding: 8,
-      border: "1px solid #dee2e6",
-      borderRadius: 5,
-      fontSize: 10,
-      fontFamily: "monospace",
-      boxSizing: "border-box",
-      marginBottom: 6
-    }
-  }), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      var txt = document.getElementById("fb-config").value;
-      try {
-        var cfg = JSON.parse(txt);
-        if (!cfg.databaseURL) {
-          alert("databaseURL fehlt in der Config.");
-          return;
-        }
-        localStorage.setItem("praxis-firebase-config", JSON.stringify(cfg));
-        window.location.reload();
-      } catch (e) {
-        alert("Ungültiges JSON: " + e.message);
-      }
-    },
-    style: {
-      padding: "6px 14px",
-      borderRadius: 6,
-      border: "none",
-      background: "#212529",
-      color: "#fff",
-      fontSize: 11,
-      fontWeight: 600,
-      cursor: "pointer"
-    }
-  }, "Verbinden"))), /*#__PURE__*/React.createElement("div", {
+  }, _fbReady ? "Alle Geraete synchronisieren automatisch." : "Firebase nicht erreichbar."))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -5692,7 +5632,7 @@ function Schichtplaner() {
       color: "#6c757d",
       marginBottom: 4
     }
-  }, "Daten sichern & wiederherstellen"), /*#__PURE__*/React.createElement("div", {
+  }, "Backup"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -5712,7 +5652,7 @@ function Schichtplaner() {
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
       a.href = url;
-      a.download = "statt-tipex-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+      a.download = "statt-tipex-backup-" + fmtDate(new Date()) + ".json";
       a.click();
       URL.revokeObjectURL(url);
     },
@@ -5755,21 +5695,16 @@ function Schichtplaner() {
             localStorage.setItem(k, JSON.stringify(data[k]));
             count++;
           });
-          alert(count + " Einstellungen wiederhergestellt. Seite wird neu geladen.");
+          alert(count + " wiederhergestellt.");
           window.location.reload();
         } catch (err) {
-          alert("Fehler beim Import: " + err.message);
+          alert("Fehler: " + err.message);
         }
       };
       reader.readAsText(file);
       e.target.value = "";
     }
-  })), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      color: "#868e96"
-    }
-  }, "Sichert Team, Rollen, Urlaube, Schichten und alle Einstellungen."))), /*#__PURE__*/React.createElement("div", {
+  })))), /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 14
     }
@@ -5780,7 +5715,7 @@ function Schichtplaner() {
       color: "#6c757d",
       marginBottom: 4
     }
-  }, "PIN-Schutz (nur Praxisleitung kann bearbeiten)"), /*#__PURE__*/React.createElement("div", {
+  }, "PIN-Schutz"), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 6,
@@ -5790,20 +5725,20 @@ function Schichtplaner() {
     id: "pin-input",
     type: "text",
     defaultValue: loadData("praxis-pin", ""),
-    placeholder: "PIN festlegen",
+    placeholder: "PIN",
     style: {
       padding: "5px 10px",
       border: "1px solid #dee2e6",
       borderRadius: 5,
       fontSize: 13,
-      width: 120,
+      width: 100,
       letterSpacing: 4
     }
   }), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       var pin = document.getElementById("pin-input").value;
       saveData("praxis-pin", pin);
-      alert(pin ? "PIN gesetzt. Beim n\\u00e4chsten \\u00d6ffnen wird die PIN abgefragt." : "PIN entfernt.");
+      alert(pin ? "PIN gesetzt." : "PIN entfernt.");
     },
     style: {
       padding: "5px 14px",
@@ -5837,13 +5772,13 @@ function Schichtplaner() {
       color: "#6c757d",
       marginBottom: 4
     }
-  }, "Urlaubsantrags-Links (zum Teilen mit dem Team)"), /*#__PURE__*/React.createElement("div", {
+  }, "Urlaubsantrags-Links"), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 10,
       color: "#868e96",
-      marginBottom: 8
+      marginBottom: 6
     }
-  }, "Jede Person bekommt einen eigenen Link. Dort kann sie Urlaub beantragen, der per WhatsApp an die Praxisleitung geht."), /*#__PURE__*/React.createElement("div", {
+  }, "Persoenliche Links zum Teilen — damit kann das Team selbst Urlaub beantragen."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5909,7 +5844,7 @@ function Schichtplaner() {
         whiteSpace: "nowrap"
       }
     }, "Kopieren"));
-  })))))), shiftModal && /*#__PURE__*/React.createElement("div", {
+  }))))), shiftModal && /*#__PURE__*/React.createElement("div", {
     onClick: () => setShiftModal(null),
     style: {
       position: "fixed",
