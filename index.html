@@ -4800,7 +4800,7 @@ function Schichtplaner() {
     style: {
       fontVariantNumeric: "tabular-nums"
     }
-  }, "v5.5"), _tenantId && /*#__PURE__*/React.createElement("span", {
+  }, "v5.6"), _tenantId && /*#__PURE__*/React.createElement("span", {
     style: {
       marginLeft: 6,
       padding: "1px 6px",
@@ -4976,6 +4976,44 @@ function Schichtplaner() {
       marginLeft: 4
     }
   }, "Woche kopieren"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (confirm("Aktuelle Woche als Standardwoche speichern?")) {
+        saveData("praxis-standard-week", assignments);
+        alert("Standardwoche gespeichert.");
+      }
+    },
+    style: {
+      padding: "5px 10px",
+      borderRadius: 5,
+      border: "1px solid #2e7d32",
+      background: "#fff",
+      cursor: "pointer",
+      fontSize: 10,
+      fontWeight: 500,
+      color: "#2e7d32"
+    }
+  }, "Als Standard speichern"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var sw = loadData("praxis-standard-week", null);
+      if (!sw) {
+        alert("Noch keine Standardwoche gespeichert.");
+        return;
+      }
+      if (confirm("Standardwoche laden? Aktuelle Planung wird ersetzt.")) {
+        setAssignments(sw);
+      }
+    },
+    style: {
+      padding: "5px 10px",
+      borderRadius: 5,
+      border: "1px solid #2e7d32",
+      background: "#2e7d32",
+      cursor: "pointer",
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#fff"
+    }
+  }, "Standardwoche"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       if (confirm("Alle Schichten dieser Woche l\u00f6schen?")) {
         setAssignments({});
