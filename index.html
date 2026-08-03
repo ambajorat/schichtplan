@@ -5057,6 +5057,16 @@ function Schichtplaner() {
   const [shiftModal, setShiftModal] = useState(null);
   const [smFrom, setSmFrom] = useState("08:00");
   const [smTo, setSmTo] = useState("14:00");
+  useEffect(() => {
+    if (!shiftModal) return;
+    var t = shiftModal.time || "08:00";
+    setSmFrom(t);
+    var ph = getPracticeHoursForDay(practiceHours || [], wsStr, shiftModal.day);
+    var close = ph && ph.to ? ph.to : "20:00";
+    if (timeToMin(close) <= timeToMin(t)) close = "20:00";
+    if (timeToMin(close) <= timeToMin(t)) close = t;
+    setSmTo(close);
+  }, [shiftModal]);
   const [showStationCfg, setShowStationCfg] = useState(false);
   const [isMobile, setIsMobile] = useState(function () {
     return typeof window !== "undefined" && window.innerWidth < 768;
@@ -7628,7 +7638,12 @@ function Schichtplaner() {
       gap: isMobile ? 6 : 4
     }
   }, staffList.map(s => {
-    const avail = isAvailable(s, shiftModal.day, "08:00", vacations, wsStr);
+    const _adt = new Date(wsStr + "T00:00:00");
+    _adt.setDate(_adt.getDate() + shiftModal.day);
+    const _ads = fmtDate(_adt);
+    const _aea = effAvail(s, shiftModal.day, _ads);
+    const _aleave = vacations.some(v => v.staffId === s.id && _ads >= v.from && _ads <= v.to);
+    const avail = !_aleave && !!_aea && _aea.from < smTo && _aea.to > smFrom;
     const roomOk = !s.rooms || s.rooms.length === 0 || s.rooms.includes(shiftModal.station);
     const canWork = avail && roomOk;
     const alreadyHere = Object.entries(assignments).some(([k, sids]) => {
