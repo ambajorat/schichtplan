@@ -1,0 +1,15 @@
+impressum.html
+datenschutz.html
+*.bak
+index.html.bak
+*-export.json
+backup/
+backups/
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+*.zip
+statt-tipex-deploy.zip
+statt-tipex-repo.zip
