@@ -33,11 +33,8 @@
   "operatingSystem": "Web",
   "description": "Digitaler Schichtplaner für Zahnarztpraxen mit automatischer Planung, Urlaubsverwaltung und WhatsApp-Integration.",
   "url": "https://statt-tipex.de",
-  "offers": {
-    "@type": "Offer",
-    "price": "0",
-    "priceCurrency": "EUR"
-  },
+  "license": "https://opensource.org/licenses/MIT",
+  "isAccessibleForFree": true,
   "featureList": [
     "Automatische Schichtplanung",
     "Arzt-Assistenz-Paarung",
@@ -81,7 +78,7 @@
       "name": "Was kostet statt-Tipex?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "statt-Tipex ist kostenlos nutzbar. Einfach unter statt-tipex.de eine Praxis anlegen und sofort loslegen."
+        "text": "statt-Tipex ist Open Source (MIT-Lizenz) und kostenlos. Unter statt-tipex.de gibt es eine gehostete Version zum Ausprobieren. Wer es produktiv nutzen möchte, kann es auf eigenen Servern selbst hosten."
       }
     },
     {
@@ -1365,7 +1362,7 @@ function TenantSetup() {
     .lp *{margin:0;padding:0;box-sizing:border-box}
     .lp{font-family:Inter,system-ui,sans-serif;color:#1c1917;-webkit-font-smoothing:antialiased}
     .lp a{color:inherit;text-decoration:none}
-    .lp-hero{min-height:92vh;display:flex;align-items:center;justify-content:center;padding:40px 24px;background:linear-gradient(165deg,#faf9f7 0%,#e7e5e4 50%,#d6d3d1 100%);position:relative;overflow:hidden}
+    .lp-hero{min-height:auto;display:flex;align-items:center;justify-content:center;padding:60px 24px 40px;background:linear-gradient(165deg,#faf9f7 0%,#e7e5e4 50%,#d6d3d1 100%);position:relative;overflow:hidden}
     .lp-hero::before{content:'';position:absolute;top:-30%;right:-20%;width:700px;height:700px;border-radius:50%;background:radial-gradient(circle,rgba(74,144,217,0.06) 0%,transparent 70%)}
     .lp-inner{max-width:720px;text-align:center;position:relative}
     .lp-badge{display:inline-block;padding:6px 18px;border-radius:20px;background:#1c1917;color:#fff;font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:24px}
@@ -1379,20 +1376,20 @@ function TenantSetup() {
     .lp-btn-s{background:#fff;color:#1c1917;border:2px solid #1c1917}
     .lp-btn-g{background:#2e7d32;color:#fff}
     .lp-sec{padding:80px 24px}
-    .lp-sec-inner{max-width:960px;margin:0 auto}
+    .lp-sec-inner{max-width:960px;margin:0 auto;text-align:center}
     .lp-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#0f766e;margin-bottom:8px}
     .lp-title{font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-1px;margin-bottom:16px;line-height:1.15}
     .lp-desc{font-size:17px;color:#a8a29e;line-height:1.6;max-width:600px;margin-bottom:48px}
     .lp-bg{background:#faf9f7}
     .lp-grid2{display:grid;grid-template-columns:1fr 1fr;gap:32px}
-    .lp-card-b{padding:32px;border-radius:16px;background:#fff0f0;border:1px solid #ffc9c9}
-    .lp-card-a{padding:32px;border-radius:16px;background:#e8f5e9;border:1px solid #a5d6a7}
+    .lp-card-b{padding:32px;border-radius:16px;background:#fff0f0;border:1px solid #ffc9c9;text-align:left}
+    .lp-card-a{padding:32px;border-radius:16px;background:#e8f5e9;border:1px solid #a5d6a7;text-align:left}
     .lp-card-b h3,.lp-card-a h3{font-size:18px;font-weight:700;margin-bottom:12px}
     .lp-card-b ul,.lp-card-a ul{list-style:none;font-size:15px;color:#44403c;line-height:2}
     .lp-card-b ul li::before{content:'✕  ';color:#e03131;font-weight:700}
     .lp-card-a ul li::before{content:'✓  ';color:#2e7d32;font-weight:700}
     .lp-grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-    .lp-fcard{padding:28px;border-radius:14px;border:1px solid #e7e5e4;background:#fff;transition:box-shadow 0.2s}
+    .lp-fcard{padding:28px;border-radius:14px;border:1px solid #e7e5e4;background:#fff;transition:box-shadow 0.2s;text-align:left}
     .lp-fcard:hover{box-shadow:0 8px 30px rgba(0,0,0,0.06)}
     .lp-ficon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:14px}
     .lp-fcard h3{font-size:16px;font-weight:700;margin-bottom:6px}
@@ -1571,6 +1568,12 @@ function TenantSetup() {
   }, "Schichtplaner für Zahnarztpraxen"), React.createElement("h1", null, "Schichtplanung ", React.createElement("br"), "statt", " ", React.createElement("span", null, "Tipp-Ex")), React.createElement("p", {
     className: "lp-sub"
   }, "Schluss mit Papierplänen, Tipp-Ex und WhatsApp-Chaos. Der digitale Schichtplaner, der mitdenkt."), React.createElement("div", {
+    style: { display: "flex", gap: 8, justifyContent: "center", marginBottom: 8 }
+  }, React.createElement("span", {
+    style: { display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 20, background: "#1c1917", color: "#fff", fontSize: 11, fontWeight: 600 }
+  }, "\u2B50 Open Source"), React.createElement("span", {
+    style: { display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 12px", borderRadius: 20, background: "#f0fdfa", color: "#0f766e", fontSize: 11, fontWeight: 600 }
+  }, "\u2705 100% kostenlos")), React.createElement("div", {
     className: "lp-actions",
     style: {
       flexDirection: "column",
@@ -1605,7 +1608,12 @@ function TenantSetup() {
       maxWidth: 320,
       justifyContent: "center"
     }
-  }, "Praxis-Code eingeben")))),
+  }, "Praxis-Code eingeben"), React.createElement("a", {
+    href: "https://github.com/ambajorat/schichtplan",
+    target: "_blank",
+    rel: "noopener",
+    style: { display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#78716c", textDecoration: "none", marginTop: 4 }
+  }, "\uD83D\uDCBB Quellcode auf GitHub")))),
   // Problem/Solution
   React.createElement("div", {
     className: "lp-sec lp-bg"
@@ -1668,7 +1676,7 @@ function TenantSetup() {
   }, {
     i: "\ud83d\udc69\u200d\u2695\ufe0f",
     t: "Rollen & Räume",
-    d: "Arzt, ZFA, ZMP, ZMV, Azubi — flexibel zuweisbar.",
+    d: "Arzt, ZFA, ZNP, ZMV, Azubi — flexibel zuweisbar.",
     bg: "#f1f8e9"
   }, {
     i: "\ud83d\udda8\ufe0f",
@@ -1704,17 +1712,11 @@ function TenantSetup() {
     className: "lp-title"
   }, "So sieht\u2019s aus"), React.createElement("p", {
     style: { color: "#78716c", marginBottom: 40, fontSize: 17, maxWidth: 540, margin: "0 auto 40px" }
-  }, "Schichtplan, Urlaubsverwaltung, Team und WhatsApp-Versand \u2014 alles im Browser, auf jedem Ger\u00e4t."),
-  // Desktop
-  React.createElement("div", {
-    style: { fontSize: 11, fontWeight: 600, color: "#a8a29e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }
-  }, "\uD83D\uDCBB Desktop"),
-  React.createElement("div", {
+  }, "Schichtplan, Urlaubsverwaltung, Team und WhatsApp-Versand \u2014 alles im Browser, auf jedem Ger\u00e4t."), React.createElement("div", {
     style: {
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-      gap: 12,
-      marginBottom: 40
+      gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+      gap: 14
     }
   },
   React.createElement("div", {
@@ -1837,11 +1839,35 @@ function TenantSetup() {
       color: "#fff", fontSize: 12, fontWeight: 600, textAlign: "left"
     }
   }, "Einstellungen")),
+  React.createElement("div", {
+    onClick: function() {
+      var lb = document.getElementById("lightbox-overlay");
+      var lbi = document.getElementById("lightbox-img");
+      if (lb && lbi) { lbi.src = "img/urlaubslinks.jpg"; lb.style.display = "flex"; }
+    },
+    style: {
+      cursor: "zoom-in", borderRadius: 12, overflow: "hidden",
+      border: "0.5px solid #e7e5e4", boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+      transition: "transform 0.2s, box-shadow 0.2s", position: "relative"
+    },
+    onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.1)"; },
+    onMouseLeave: function(e) { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = "0 2px 12px rgba(0,0,0,0.06)"; }
+  }, React.createElement("img", {
+    src: "img/urlaubslinks.jpg", alt: "Urlaubsantrags-Links", loading: "lazy",
+    style: { width: "100%", display: "block" }
+  }), React.createElement("div", {
+    style: {
+      position: "absolute", bottom: 0, left: 0, right: 0,
+      padding: "20px 14px 10px",
+      background: "linear-gradient(transparent, rgba(0,0,0,0.45))",
+      color: "#fff", fontSize: 12, fontWeight: 600, textAlign: "left"
+    }
+  }, "Urlaubsantrags-Links")),
   ),
   // Mobile
   React.createElement("div", {
-    style: { fontSize: 11, fontWeight: 600, color: "#a8a29e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }
-  }, "\uD83D\uDCF1 Mobile"),
+    style: { marginTop: 40, fontSize: 11, fontWeight: 600, color: "#a8a29e", textTransform: "uppercase", letterSpacing: 1, marginBottom: 12 }
+  }, "\uD83D\uDCF1 Auch mobil \u2014 auf jedem Smartphone"),
   React.createElement("div", {
     style: {
       display: "flex",
@@ -1850,127 +1876,13 @@ function TenantSetup() {
       flexWrap: "wrap"
     }
   },
-  React.createElement("div", {
-    style: { width: 120 }
-  }, React.createElement("div", {
-    onClick: function() {
-      var lb = document.getElementById("lightbox-overlay");
-      var lbi = document.getElementById("lightbox-img");
-      if (lb && lbi) { lbi.src = "img/m-schichtplan.jpg"; lb.style.display = "flex"; }
-    },
-    style: {
-      borderRadius: 16, overflow: "hidden", background: "#1c1917",
-      padding: "6px 3px", cursor: "zoom-in",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-      transition: "transform 0.2s"
-    },
-    onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; },
-    onMouseLeave: function(e) { e.currentTarget.style.transform = ""; }
-  }, React.createElement("div", {
-    style: { borderRadius: 12, overflow: "hidden" }
-  }, React.createElement("img", {
-    src: "img/m-schichtplan.jpg", alt: "Schichtplan Mobile", loading: "lazy",
-    style: { width: "100%", display: "block" }
-  }))), React.createElement("div", {
-    style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" }
-  }, "Schichtplan")),
-  React.createElement("div", {
-    style: { width: 120 }
-  }, React.createElement("div", {
-    onClick: function() {
-      var lb = document.getElementById("lightbox-overlay");
-      var lbi = document.getElementById("lightbox-img");
-      if (lb && lbi) { lbi.src = "img/m-urlaub.jpg"; lb.style.display = "flex"; }
-    },
-    style: {
-      borderRadius: 16, overflow: "hidden", background: "#1c1917",
-      padding: "6px 3px", cursor: "zoom-in",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-      transition: "transform 0.2s"
-    },
-    onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; },
-    onMouseLeave: function(e) { e.currentTarget.style.transform = ""; }
-  }, React.createElement("div", {
-    style: { borderRadius: 12, overflow: "hidden" }
-  }, React.createElement("img", {
-    src: "img/m-urlaub.jpg", alt: "Urlaub Mobile", loading: "lazy",
-    style: { width: "100%", display: "block" }
-  }))), React.createElement("div", {
-    style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" }
-  }, "Urlaub")),
-  React.createElement("div", {
-    style: { width: 120 }
-  }, React.createElement("div", {
-    onClick: function() {
-      var lb = document.getElementById("lightbox-overlay");
-      var lbi = document.getElementById("lightbox-img");
-      if (lb && lbi) { lbi.src = "img/m-team.jpg"; lb.style.display = "flex"; }
-    },
-    style: {
-      borderRadius: 16, overflow: "hidden", background: "#1c1917",
-      padding: "6px 3px", cursor: "zoom-in",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-      transition: "transform 0.2s"
-    },
-    onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; },
-    onMouseLeave: function(e) { e.currentTarget.style.transform = ""; }
-  }, React.createElement("div", {
-    style: { borderRadius: 12, overflow: "hidden" }
-  }, React.createElement("img", {
-    src: "img/m-team.jpg", alt: "Team Mobile", loading: "lazy",
-    style: { width: "100%", display: "block" }
-  }))), React.createElement("div", {
-    style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" }
-  }, "Team")),
-  React.createElement("div", {
-    style: { width: 120 }
-  }, React.createElement("div", {
-    onClick: function() {
-      var lb = document.getElementById("lightbox-overlay");
-      var lbi = document.getElementById("lightbox-img");
-      if (lb && lbi) { lbi.src = "img/m-whatsapp.jpg"; lb.style.display = "flex"; }
-    },
-    style: {
-      borderRadius: 16, overflow: "hidden", background: "#1c1917",
-      padding: "6px 3px", cursor: "zoom-in",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-      transition: "transform 0.2s"
-    },
-    onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; },
-    onMouseLeave: function(e) { e.currentTarget.style.transform = ""; }
-  }, React.createElement("div", {
-    style: { borderRadius: 12, overflow: "hidden" }
-  }, React.createElement("img", {
-    src: "img/m-whatsapp.jpg", alt: "WhatsApp Mobile", loading: "lazy",
-    style: { width: "100%", display: "block" }
-  }))), React.createElement("div", {
-    style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" }
-  }, "WhatsApp")),
-  React.createElement("div", {
-    style: { width: 120 }
-  }, React.createElement("div", {
-    onClick: function() {
-      var lb = document.getElementById("lightbox-overlay");
-      var lbi = document.getElementById("lightbox-img");
-      if (lb && lbi) { lbi.src = "img/m-einstellungen.jpg"; lb.style.display = "flex"; }
-    },
-    style: {
-      borderRadius: 16, overflow: "hidden", background: "#1c1917",
-      padding: "6px 3px", cursor: "zoom-in",
-      boxShadow: "0 4px 16px rgba(0,0,0,0.1)",
-      transition: "transform 0.2s"
-    },
-    onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; },
-    onMouseLeave: function(e) { e.currentTarget.style.transform = ""; }
-  }, React.createElement("div", {
-    style: { borderRadius: 12, overflow: "hidden" }
-  }, React.createElement("img", {
-    src: "img/m-einstellungen.jpg", alt: "Einstellungen Mobile", loading: "lazy",
-    style: { width: "100%", display: "block" }
-  }))), React.createElement("div", {
-    style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" }
-  }, "Einstellungen")),
+  React.createElement("div", { style: { width: 110 } }, React.createElement("div", { onClick: function() { var lb = document.getElementById("lightbox-overlay"); var lbi = document.getElementById("lightbox-img"); if (lb && lbi) { lbi.src = "img/m-schichtplan.jpg"; lb.style.display = "flex"; } }, style: { borderRadius: 16, overflow: "hidden", background: "#1c1917", padding: "6px 3px", cursor: "zoom-in", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", transition: "transform 0.2s" }, onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; }, onMouseLeave: function(e) { e.currentTarget.style.transform = ""; } }, React.createElement("div", { style: { borderRadius: 12, overflow: "hidden" } }, React.createElement("img", { src: "img/m-schichtplan.jpg", alt: "Schichtplan Mobile", loading: "lazy", style: { width: "100%", display: "block" } }))), React.createElement("div", { style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" } }, "Schichtplan")),
+  React.createElement("div", { style: { width: 110 } }, React.createElement("div", { onClick: function() { var lb = document.getElementById("lightbox-overlay"); var lbi = document.getElementById("lightbox-img"); if (lb && lbi) { lbi.src = "img/m-urlaub.jpg"; lb.style.display = "flex"; } }, style: { borderRadius: 16, overflow: "hidden", background: "#1c1917", padding: "6px 3px", cursor: "zoom-in", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", transition: "transform 0.2s" }, onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; }, onMouseLeave: function(e) { e.currentTarget.style.transform = ""; } }, React.createElement("div", { style: { borderRadius: 12, overflow: "hidden" } }, React.createElement("img", { src: "img/m-urlaub.jpg", alt: "Urlaub Mobile", loading: "lazy", style: { width: "100%", display: "block" } }))), React.createElement("div", { style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" } }, "Urlaub")),
+  React.createElement("div", { style: { width: 110 } }, React.createElement("div", { onClick: function() { var lb = document.getElementById("lightbox-overlay"); var lbi = document.getElementById("lightbox-img"); if (lb && lbi) { lbi.src = "img/m-team.jpg"; lb.style.display = "flex"; } }, style: { borderRadius: 16, overflow: "hidden", background: "#1c1917", padding: "6px 3px", cursor: "zoom-in", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", transition: "transform 0.2s" }, onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; }, onMouseLeave: function(e) { e.currentTarget.style.transform = ""; } }, React.createElement("div", { style: { borderRadius: 12, overflow: "hidden" } }, React.createElement("img", { src: "img/m-team.jpg", alt: "Team Mobile", loading: "lazy", style: { width: "100%", display: "block" } }))), React.createElement("div", { style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" } }, "Team")),
+  React.createElement("div", { style: { width: 110 } }, React.createElement("div", { onClick: function() { var lb = document.getElementById("lightbox-overlay"); var lbi = document.getElementById("lightbox-img"); if (lb && lbi) { lbi.src = "img/m-whatsapp.jpg"; lb.style.display = "flex"; } }, style: { borderRadius: 16, overflow: "hidden", background: "#1c1917", padding: "6px 3px", cursor: "zoom-in", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", transition: "transform 0.2s" }, onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; }, onMouseLeave: function(e) { e.currentTarget.style.transform = ""; } }, React.createElement("div", { style: { borderRadius: 12, overflow: "hidden" } }, React.createElement("img", { src: "img/m-whatsapp.jpg", alt: "WhatsApp Mobile", loading: "lazy", style: { width: "100%", display: "block" } }))), React.createElement("div", { style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" } }, "WhatsApp")),
+  React.createElement("div", { style: { width: 110 } }, React.createElement("div", { onClick: function() { var lb = document.getElementById("lightbox-overlay"); var lbi = document.getElementById("lightbox-img"); if (lb && lbi) { lbi.src = "img/m-einstellungen.jpg"; lb.style.display = "flex"; } }, style: { borderRadius: 16, overflow: "hidden", background: "#1c1917", padding: "6px 3px", cursor: "zoom-in", boxShadow: "0 4px 16px rgba(0,0,0,0.1)", transition: "transform 0.2s" }, onMouseEnter: function(e) { e.currentTarget.style.transform = "translateY(-3px)"; }, onMouseLeave: function(e) { e.currentTarget.style.transform = ""; } }, React.createElement("div", { style: { borderRadius: 12, overflow: "hidden" } }, React.createElement("img", { src: "img/m-einstellungen.jpg", alt: "Einstellungen Mobile", loading: "lazy", style: { width: "100%", display: "block" } }))), React.createElement("div", { style: { textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 500, color: "#78716c" } }, "Einstellungen")),
   ))),
+
   // Steps
   React.createElement("div", {
     className: "lp-sec lp-bg"
@@ -1991,152 +1903,101 @@ function TenantSetup() {
   }, React.createElement("h3", null, "Team eintragen"), React.createElement("p", null, "Mitarbeiterinnen, Rollen, Verfügbarkeiten.")), React.createElement("div", {
     className: "lp-step"
   }, React.createElement("h3", null, "Planen & teilen"), React.createElement("p", null, "Vorschlag generieren, per WhatsApp senden."))))),
-  // Pricing
+  // Open Source
+  React.createElement("div", {
+    className: "lp-sec",
+    style: { background: "#1c1917", color: "#fff" }
+  }, React.createElement("div", {
+    className: "lp-sec-inner",
+    style: { textAlign: "center" }
+  }, React.createElement("div", {
+    style: { fontSize: 11, fontWeight: 600, color: "#0f766e", textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 12 }
+  }, "\u2B50 Open Source"), React.createElement("div", {
+    style: { fontSize: 32, fontWeight: 800, marginBottom: 16, letterSpacing: -1 }
+  }, "Quellcode offen. F\u00fcr alle."), React.createElement("p", {
+    style: { color: "#a8a29e", fontSize: 16, maxWidth: 520, margin: "0 auto 28px", lineHeight: 1.7 }
+  }, "statt-Tipex ist MIT-lizenziert. Du kannst den Code lesen, anpassen, selbst hosten oder weiterentwickeln. Gebaut mit React, Firebase Realtime Database und einer einzigen HTML-Datei."), React.createElement("div", {
+    style: { display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }
+  }, React.createElement("a", {
+    href: "https://github.com/ambajorat/schichtplan",
+    target: "_blank",
+    rel: "noopener",
+    style: { display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 12, background: "#fff", color: "#1c1917", fontSize: 14, fontWeight: 600, textDecoration: "none" }
+  }, "\uD83D\uDCBB GitHub"), React.createElement("a", {
+    href: "https://github.com/ambajorat/schichtplan/issues",
+    target: "_blank",
+    rel: "noopener",
+    style: { display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 24px", borderRadius: 12, background: "transparent", border: "1px solid #44403c", color: "#fff", fontSize: 14, fontWeight: 500, textDecoration: "none" }
+  }, "\uD83D\uDC1B Issues & Ideen")), React.createElement("div", {
+    style: { display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap" }
+  }, React.createElement("div", {
+    style: { fontSize: 12, color: "#78716c" }
+  }, React.createElement("span", { style: { color: "#0f766e", fontWeight: 700 } }, "MIT"), " Lizenz"), React.createElement("div", {
+    style: { fontSize: 12, color: "#78716c" }
+  }, React.createElement("span", { style: { color: "#0f766e", fontWeight: 700 } }, "1"), " HTML-Datei"), React.createElement("div", {
+    style: { fontSize: 12, color: "#78716c" }
+  }, React.createElement("span", { style: { color: "#0f766e", fontWeight: 700 } }, "0"), " Dependencies"), React.createElement("div", {
+    style: { fontSize: 12, color: "#78716c" }
+  }, React.createElement("span", { style: { color: "#0f766e", fontWeight: 700 } }, "\u221E"), " Self-hostable")))),
+  // Mitmachen
   React.createElement("div", {
     className: "lp-sec"
   }, React.createElement("div", {
     className: "lp-sec-inner",
-    style: {
-      textAlign: "center"
-    }
+    style: { textAlign: "center" }
   }, React.createElement("div", {
     className: "lp-label"
-  }, "Kosten"), React.createElement("div", {
+  }, "Ausprobieren"), React.createElement("div", {
     className: "lp-title"
-  }, "Jetzt kostenlos. Für immer fair."), React.createElement("div", {
-    style: {
-      display: "flex",
-      gap: 24,
-      justifyContent: "center",
-      flexWrap: "wrap",
-      marginBottom: 32
-    }
-  }, React.createElement("div", {
-    className: "lp-price",
-    style: {
-      flex: "1 1 300px",
-      maxWidth: 360
-    }
-  }, React.createElement("div", {
-    className: "pr"
-  }, "0 \u20ac"), React.createElement("div", {
-    className: "prs"
-  }, "Free"), React.createElement("ul", null, React.createElement("li", null, "Bis zu 10 Mitarbeiterinnen"), React.createElement("li", null, "Schichtplan erstellen & bearbeiten"), React.createElement("li", null, "WhatsApp-Versand"), React.createElement("li", null, "Druckansicht")), React.createElement("button", {
-    className: "lp-btn lp-btn-p",
-    onClick: function () {
-      setMode("create");
-    },
-    style: {
-      width: "100%",
-      justifyContent: "center"
-    }
-  }, "Kostenlos starten")), React.createElement("div", {
-    className: "lp-price",
-    style: {
-      flex: "1 1 300px",
-      maxWidth: 360,
-      border: "1px solid #0f766e",
-      position: "relative"
-    }
-  }, React.createElement("div", {
-    style: {
-      position: "absolute",
-      top: -12,
-      left: "50%",
-      transform: "translateX(-50%)",
-      background: "#0f766e",
-      color: "#fff",
-      padding: "3px 14px",
-      borderRadius: 10,
-      fontSize: 11,
-      fontWeight: 700
-    }
-  }, "Bald verfügbar"), React.createElement("div", {
-    className: "pr",
-    style: {
-      color: "#0f766e"
-    }
-  }, "Pro"), React.createElement("div", {
-    className: "prs"
-  }, "Für wachsende Praxen"), React.createElement("ul", null, React.createElement("li", null, "Unbegrenzte Mitarbeiterinnen"), React.createElement("li", null, "Auto-Scheduler mit Vorschlägen"), React.createElement("li", null, "Echtzeit-Sync über alle Geräte"), React.createElement("li", null, "Urlaubsanträge mit Freigabe"), React.createElement("li", null, "Sonderöffnungszeiten & Standardwoche"), React.createElement("li", null, "Backup & Export")), React.createElement("div", {
-    style: {
-      padding: "10px 16px",
-      background: "#f0fdfa",
-      borderRadius: 8,
-      fontSize: 13,
-      color: "#0f766e",
-      fontWeight: 600
-    }
-  }, "Preis wird noch bekannt gegeben"))), React.createElement("div", {
-    style: {
-      maxWidth: 480,
-      margin: "0 auto",
-      padding: "20px 24px",
-      background: "#e8f5e9",
-      borderRadius: 12,
-      border: "1px solid #a5d6a7"
-    }
-  }, React.createElement("div", {
-    style: {
-      fontSize: 15,
-      fontWeight: 700,
-      color: "#2e7d32",
-      marginBottom: 6
-    }
-  }, "\u{1F389} Beta-Versprechen"), React.createElement("div", {
-    style: {
-      fontSize: 14,
-      color: "#2e7d32",
-      lineHeight: 1.6
-    }
-  }, "Alle Praxen, die jetzt in der Beta-Phase einsteigen, behalten dauerhaft kostenlosen Zugang zu allen Features. Kein Kleingedrucktes, kein Ablaufdatum. Als Dank fürs Mitmachen.")))),
-  // CTA
-  React.createElement("div", {
-    className: "lp-sec lp-cta"
-  }, React.createElement("div", {
-    className: "lp-sec-inner"
-  }, React.createElement("div", {
-    className: "lp-title"
-  }, "Bereit für den Abschied vom Tipp-Ex?"), React.createElement("div", {
-    className: "lp-desc",
-    style: {
-      marginLeft: "auto",
-      marginRight: "auto"
-    }
-  }, "Testen Sie die Demo oder legen Sie direkt Ihre Praxis an."), React.createElement("div", {
-    className: "lp-actions"
+  }, "Einfach loslegen"), React.createElement("p", {
+    style: { color: "#78716c", fontSize: 16, maxWidth: 540, margin: "0 auto 32px", lineHeight: 1.7 }
+  }, "statt-Tipex ist ein Open-Source-Projekt. Wir stellen eine gehostete Version zum Ausprobieren bereit \u2014 ohne Garantien, ohne Verpflichtungen. Wer es produktiv nutzen will, kann es jederzeit selbst hosten."), React.createElement("div", {
+    style: { display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap", marginBottom: 24 }
   }, React.createElement("button", {
     className: "lp-btn lp-btn-p",
-    onClick: function () {
-      setMode("create");
-    }
-  }, "Praxis anlegen"), React.createElement("button", {
-    className: "lp-btn lp-btn-s",
-    onClick: startDemo
-  }, "Demo ausprobieren")))),
+    onClick: function () { setMode("create"); },
+    style: { justifyContent: "center" }
+  }, "Praxis anlegen & ausprobieren"), React.createElement("button", {
+    className: "lp-btn lp-btn-g",
+    onClick: startDemo,
+    style: { justifyContent: "center" }
+  }, "Demo ansehen")), React.createElement("div", {
+    style: { display: "flex", gap: 20, justifyContent: "center", flexWrap: "wrap", fontSize: 13, color: "#a8a29e" }
+  }, React.createElement("a", {
+    href: "https://github.com/ambajorat/schichtplan",
+    target: "_blank", rel: "noopener",
+    style: { color: "#78716c", textDecoration: "none" }
+  }, "\uD83D\uDCBB GitHub"), React.createElement("a", {
+    href: "https://github.com/ambajorat/schichtplan/issues",
+    target: "_blank", rel: "noopener",
+    style: { color: "#78716c", textDecoration: "none" }
+  }, "\uD83D\uDC1B Issues"), React.createElement("span", null, "MIT-Lizenz"), React.createElement("a", {
+    href: "https://buymeacoffee.com/ploetzlichquerschnitt",
+    target: "_blank", rel: "noopener",
+    style: { color: "#78716c", textDecoration: "none" }
+  }, "\u2615 Buy me a coffee")))),
   // Footer
   React.createElement("div", {
     className: "lp-footer"
-  }, React.createElement("p", null, "statt-Tipex \u2014 Digitaler Schichtplaner für Zahnarztpraxen"), React.createElement("p", {
-    style: {
-      marginTop: 6
-    }
-  }, "Ein Produkt der amb capital UG"), React.createElement("p", {
-    style: {
-      marginTop: 8
-    }
+  }, React.createElement("p", null, "statt-Tipex \u2014 ein Open-Source-Schichtplaner f\u00fcr Zahnarztpraxen"), React.createElement("p", {
+    style: { marginTop: 6 }
+  }, "Gebaut von ", React.createElement("a", {
+    href: "https://github.com/ambajorat/schichtplan",
+    target: "_blank", rel: "noopener",
+    style: { color: "#a8a29e" }
+  }, "Andr\u00e9 Bajorat"), " \u2014 MIT-Lizenz"), React.createElement("p", {
+    style: { marginTop: 8 }
   }, React.createElement("a", {
     href: "/impressum.html",
-    style: {
-      color: "#a8a29e",
-      marginRight: 16
-    }
+    style: { color: "#a8a29e", marginRight: 16 }
   }, "Impressum"), React.createElement("a", {
     href: "/datenschutz.html",
-    style: {
-      color: "#a8a29e"
-    }
-  }, "Datenschutz"))));
+    style: { color: "#a8a29e" }
+  }, "Datenschutz"), React.createElement("a", {
+    href: "https://buymeacoffee.com/ploetzlichquerschnitt",
+    target: "_blank", rel: "noopener",
+    style: { color: "#a8a29e", marginLeft: 16 }
+  }, "\u2615 Kaffee spendieren"))));
 }
 function VacationRequestPage({
   data
@@ -7673,10 +7534,10 @@ function Schichtplaner() {
         color: canWork ? s.color : "#d6d3d1",
         fontSize: isMobile ? 14 : 12,
         fontWeight: 600,
-        cursor: canWork ? "pointer" : "default",
-        opacity: canWork ? 1 : 0.35
+        cursor: absence ? "default" : "pointer",
+        opacity: absence ? 0.35 : (canWork ? 1 : 0.6)
       },
-      disabled: !canWork
+      disabled: !!absence
     }, /*#__PURE__*/React.createElement("span", {
       style: {
         width: 7,
