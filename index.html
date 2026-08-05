@@ -802,10 +802,15 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       var tk = dayIdx + "-" + stationId + "-" + si + "-" + fromTime;
       if (!plan[tk] || plan[tk].length === 0) { slot = si; break; }
     }
+    // Wochenarbeitszeit kappen: nie mehr Slots zuweisen, als maxHours noch zulässt
+    var _st = null;
+    for (var _i = 0; _i < staffList.length; _i++) { if (staffList[_i].id === staffId) { _st = staffList[_i]; break; } }
+    var _maxH = _st ? (_st.maxHours || 40) : 40;
+    var _capSlots = Math.max(0, Math.floor((_maxH - (weekHours[staffId] || 0)) / 0.5));
     var count = 0;
     TIME_SLOTS.forEach(function (ts) {
       var t = timeToMin(ts.start);
-      if (t >= timeToMin(fromTime) && t < timeToMin(toTime)) {
+      if (t >= timeToMin(fromTime) && t < timeToMin(toTime) && count < _capSlots) {
         plan[dayIdx + "-" + stationId + "-" + slot + "-" + ts.start] = [staffId];
         count++;
       }
