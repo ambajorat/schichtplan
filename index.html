@@ -791,10 +791,50 @@ function getWeeklyHours(assignments, staffId) {
 function buildDefault() {
   return {};
 }
-function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practiceHours) {
+function buildHistoryScores(weeks) {
+  var sc = {};
+  (weeks || []).forEach(function (w) {
+    if (!w || !w.data) return;
+    var wgt = Math.pow(0.85, (w.age || 1) - 1);
+    Object.keys(w.data).forEach(function (k) {
+      var p = k.split("-");
+      if (p.length < 4) return;
+      (w.data[k] || []).forEach(function (sid) {
+        var key = sid + "|" + p[0] + "|" + p[1];
+        sc[key] = (sc[key] || 0) + wgt * 0.5;
+      });
+    });
+  });
+  return sc;
+}
+function loadHistoryScores(weekStartStr, nWeeks) {
+  var proms = [];
+  for (var i = 1; i <= nWeeks; i++) {
+    (function (age) {
+      var d = new Date(weekStartStr + "T00:00:00");
+      d.setDate(d.getDate() - 7 * age);
+      var key = "praxis-" + weekKey(d);
+      var local = loadData(key, null);
+      if (local && Object.keys(local).length) {
+        proms.push(Promise.resolve({ age: age, data: local }));
+      } else if (_fbDb && _tenantId) {
+        proms.push(_fbDb.ref(fbPath() + fbKey(key)).once("value").then(function (s) {
+          return { age: age, data: s.val() || null };
+        }).catch(function () { return { age: age, data: null }; }));
+      } else {
+        proms.push(Promise.resolve({ age: age, data: null }));
+      }
+    })(i);
+  }
+  return Promise.all(proms).then(buildHistoryScores).catch(function () { return {}; });
+}
+function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practiceHours, historyScores) {
   var plan = {};
   var weekHours = {};
   staffList.forEach(function (s) { weekHours[s.id] = 0; });
+  function histScore(sid, dayIdx, stationId) {
+    return historyScores && historyScores[sid + "|" + dayIdx + "|" + stationId] || 0;
+  }
 
   function assignBlock(dayIdx, stationId, staffId, fromTime, toTime) {
     var slot = 0;
@@ -880,10 +920,14 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       return { from: bestFrom, to: addEnd(bestTo) };
     }
 
-    function sortFair(arr) {
+    function sortFair(arr, stationId) {
       arr.sort(function (a, b) {
         var hw = weekHours[a.id] - weekHours[b.id];
         if (Math.abs(hw) > 0.5) return hw;
+        if (stationId) {
+          var hs = histScore(b.id, di, stationId) - histScore(a.id, di, stationId);
+          if (Math.abs(hs) > 0.25) return hs;
+        }
         return countBusy(a.id) - countBusy(b.id);
       });
     }
@@ -895,7 +939,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
         if (weekHours[a.id] >= a.maxH) return false;
         return getLongestFreeBlock(a, fromT, toT) !== null;
       });
-      sortFair(candidates);
+      sortFair(candidates, stationId);
       var covered = {};
       TIME_SLOTS.forEach(function (ts) {
         var t = timeToMin(ts.start);
@@ -960,7 +1004,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
           if (weekHours[a.id] >= a.maxH) return false;
           return getLongestFreeBlock(a, openFrom, openTo) !== null;
         });
-        sortFair(docCandidates);
+        sortFair(docCandidates, room.id);
         var placed = false;
         for (var dj = 0; dj < docCandidates.length && !placed; dj++) {
           var doc = docCandidates[dj];
@@ -1003,7 +1047,7 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       if (weekHours[a.id] >= a.maxH) return false;
       return countBusy(a.id) === 0 && getLongestFreeBlock(a, openFrom, openTo) !== null;
     });
-    sortFair(freeZmv);
+    sortFair(freeZmv, "buero");
     var bueroCount = 0;
     freeZmv.forEach(function (a) {
       if (bueroCount >= 2) return;
@@ -4923,7 +4967,11 @@ function Schichtplaner() {
   const [shiftModal, setShiftModal] = useState(null);
   const [smFrom, setSmFrom] = useState("08:00");
   const [smTo, setSmTo] = useState("14:00");
+  const [editShiftSid, setEditShiftSid] = useState(null);
+  const [esFrom, setEsFrom] = useState("");
+  const [esTo, setEsTo] = useState("");
   useEffect(() => {
+    setEditShiftSid(null);
     if (!shiftModal) return;
     var t = shiftModal.time || "08:00";
     setSmFrom(t);
@@ -5029,6 +5077,25 @@ function Schichtplaner() {
     });
     setShiftModal(null);
   }, [shiftModal, smFrom, smTo]);
+  const updatePersonTime = useCallback((staffId, day, station, fromT, toT) => {
+    if (!fromT || !toT || toT <= fromT) return;
+    setAssignments(prev => {
+      const n = { ...prev };
+      Object.keys(n).forEach(k => {
+        const p = k.split("-");
+        if (parseInt(p[0]) === day && p[1] === station && n[k]) {
+          n[k] = n[k].filter(id => id !== staffId);
+          if (!n[k].length) delete n[k];
+        }
+      });
+      const slot = findFreeSlot(n, day, station, fromT, toT);
+      TIME_SLOTS.filter(s => s.start >= fromT && s.start < toT).forEach(sl => {
+        n[`${day}-${station}-${slot}-${sl.start}`] = [staffId];
+      });
+      return n;
+    });
+    setEditShiftSid(null);
+  }, []);
   const removePersonStation = useCallback((staffId, day, station) => {
     setAssignments(prev => {
       const n = {
@@ -6121,9 +6188,11 @@ function Schichtplaner() {
           reqs: reqs
         };
       });
-      var proposed = autoSchedule(staffList, vacations, wsStr, cfg, practiceHours);
-      setAssignments(proposed);
-      setShowStationCfg(false);
+      loadHistoryScores(wsStr, 6).then(function (hist) {
+        var proposed = autoSchedule(staffList, vacations, wsStr, cfg, practiceHours, hist);
+        setAssignments(proposed);
+        setShowStationCfg(false);
+      });
     },
     style: {
       padding: "7px 18px",
@@ -6135,7 +6204,7 @@ function Schichtplaner() {
       fontWeight: 600,
       cursor: "pointer"
     }
-  }, "Neuen Wochenplan generieren"), /*#__PURE__*/React.createElement("button", {
+  }, "Neuen Wochenplan generieren"), /*#__PURE__*/React.createElement("div", { style: { width: "100%", fontSize: 9, color: "#a8a29e", marginTop: 4 } }, "Der Vorschlag bevorzugt bewährte Zuordnungen aus den letzten 6 Wochen (Fairness und Regeln gehen vor)."), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
       var cfg = STATIONS.map(function (st) {
         var reqs = [];
@@ -6151,15 +6220,17 @@ function Schichtplaner() {
           reqs: reqs
         };
       });
-      var proposed = autoSchedule(staffList, vacations, wsStr, cfg, practiceHours);
-      setAssignments(function (prev) {
-        var merged = Object.assign({}, prev);
-        Object.keys(proposed).forEach(function (k) {
-          if (!merged[k] || merged[k].length === 0) merged[k] = proposed[k];
+      loadHistoryScores(wsStr, 6).then(function (hist) {
+        var proposed = autoSchedule(staffList, vacations, wsStr, cfg, practiceHours, hist);
+        setAssignments(function (prev) {
+          var merged = Object.assign({}, prev);
+          Object.keys(proposed).forEach(function (k) {
+            if (!merged[k] || merged[k].length === 0) merged[k] = proposed[k];
+          });
+          return merged;
         });
-        return merged;
+        setShowStationCfg(false);
       });
-      setShowStationCfg(false);
     },
     style: {
       padding: "7px 18px",
@@ -6456,7 +6527,17 @@ function Schichtplaner() {
       setStaffList(prev => prev.map(s => s.id === u.id ? u : s));
       setEditingAv(null);
     }
-  }) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement(HoursOverview, {
+  }) : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: prevWeek,
+    style: { padding: "4px 12px", borderRadius: 8, border: "1px solid #d6d3d1", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#44403c" }
+  }, "\u2039"), /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 12, fontWeight: 600, color: "#44403c", minWidth: 150, textAlign: "center" }
+  }, fmtDateDE(wsStr), " \u2013 ", fmtDateDE(fmtDate(wEnd))), /*#__PURE__*/React.createElement("button", {
+    onClick: nextWeek,
+    style: { padding: "4px 12px", borderRadius: 8, border: "1px solid #d6d3d1", background: "#fff", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#44403c" }
+  }, "\u203a")), /*#__PURE__*/React.createElement(HoursOverview, {
     staffList: staffList,
     assignments: assignments
   }), /*#__PURE__*/React.createElement("div", {
@@ -7384,13 +7465,32 @@ function Schichtplaner() {
           fontWeight: 600,
           color: s.color
         }
-      }, s.name), /*#__PURE__*/React.createElement("span", {
+      }, s.name), editShiftSid === sid ? /*#__PURE__*/React.createElement("span", {
+        style: { display: "flex", alignItems: "center", gap: 4, flex: 1 }
+      }, /*#__PURE__*/React.createElement("input", {
+        type: "time", value: esFrom, onChange: e => setEsFrom(e.target.value),
+        style: { padding: "2px 4px", border: "1px solid #d6d3d1", borderRadius: 4, fontSize: isMobile ? 12 : 10, fontFamily: "inherit" }
+      }), "\u2013", /*#__PURE__*/React.createElement("input", {
+        type: "time", value: esTo, onChange: e => setEsTo(e.target.value),
+        style: { padding: "2px 4px", border: "1px solid #d6d3d1", borderRadius: 4, fontSize: isMobile ? 12 : 10, fontFamily: "inherit" }
+      }), /*#__PURE__*/React.createElement("button", {
+        onClick: () => updatePersonTime(sid, shiftModal.day, shiftModal.station, esFrom, esTo),
+        style: { padding: "2px 10px", borderRadius: 4, border: "none", background: "#0f766e", color: "#fff", fontSize: isMobile ? 12 : 10, fontWeight: 700, cursor: "pointer" }
+      }, "OK"), /*#__PURE__*/React.createElement("button", {
+        onClick: () => setEditShiftSid(null),
+        title: "Abbrechen",
+        style: { padding: "2px 6px", borderRadius: 4, border: "1px solid #d6d3d1", background: "#fff", color: "#a8a29e", fontSize: isMobile ? 12 : 10, cursor: "pointer" }
+      }, "\u2715")) : /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: isMobile ? 12 : 10,
           color: "#a8a29e",
           flex: 1
         }
-      }, ranges.join(", ")), /*#__PURE__*/React.createElement("select", {
+      }, ranges.join(", ")), editShiftSid === sid ? null : /*#__PURE__*/React.createElement("button", {
+        onClick: () => { setEditShiftSid(sid); setEsFrom(times[0]); setEsTo(addEnd(times[times.length - 1])); },
+        title: "Zeit \u00e4ndern (verl\u00e4ngern/verk\u00fcrzen)",
+        style: { padding: isMobile ? "6px 8px" : "2px 6px", border: "1px solid #0f766e", borderRadius: isMobile ? 6 : 4, background: "#fff", fontSize: isMobile ? 12 : 10, color: "#0f766e", fontWeight: 600, cursor: "pointer" }
+      }, "Zeit"), /*#__PURE__*/React.createElement("select", {
         onChange: function (e) {
           if (e.target.value) movePersonStation(sid, shiftModal.day, shiftModal.station, e.target.value);
         },
