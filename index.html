@@ -4856,6 +4856,73 @@ function VacationManager({
   })));
 }
 
+// Wochen-Übersicht: pro Tag eine Karte mit allen Räumen und Personen
+function WeekOverview({ assignments, staffList, vacations, weekStart, practiceHours }) {
+  var h = React.createElement;
+  return h("div", {
+    style: { display: "flex", flexWrap: "wrap", gap: 12 }
+  }, DAYS.map(function (dn, di) {
+    var stData = [];
+    STATIONS.forEach(function (st) {
+      var people = {};
+      Object.entries(assignments).forEach(function (entry) {
+        var k = entry[0], sids = entry[1];
+        if (!sids || !sids.length) return;
+        var p = k.split("-");
+        if (parseInt(p[0]) !== di || p[1] !== st.id) return;
+        sids.forEach(function (sid) {
+          if (!people[sid]) people[sid] = [];
+          people[sid].push(p[3]);
+        });
+      });
+      var entries = [];
+      Object.entries(people).forEach(function (entry) {
+        var sid = entry[0], times = entry[1];
+        times.sort();
+        var ranges = [], rs = times[0], re = times[0];
+        for (var i = 1; i < times.length; i++) {
+          if (timeToMin(times[i]) === timeToMin(re) + 30) re = times[i];
+          else { ranges.push(rs + "–" + addEnd(re)); rs = times[i]; re = times[i]; }
+        }
+        ranges.push(rs + "–" + addEnd(re));
+        var s = staffList.find(function (x) { return x.id === sid; });
+        if (s) entries.push({ name: s.name, color: s.color, ranges: ranges, isArzt: hasRole(s, "arzt") });
+      });
+      entries.sort(function (a, b) {
+        return (b.isArzt ? 1 : 0) - (a.isArzt ? 1 : 0) || (a.ranges[0] || "").localeCompare(b.ranges[0] || "");
+      });
+      if (entries.length) stData.push({ label: st.label, entries: entries });
+    });
+    var dt = new Date(weekStart);
+    dt.setDate(dt.getDate() + di);
+    var ds = fmtDate(dt);
+    var closed = isPracticeClosed(practiceHours || [], ds, di);
+    var absent = vacations.filter(function (v) { return ds >= v.from && ds <= v.to; }).map(function (v) {
+      var s = staffList.find(function (x) { return x.id === v.staffId; });
+      return s ? { note: v.note, name: s.name } : null;
+    }).filter(Boolean);
+    return h("div", {
+      key: di,
+      style: { flex: "1 1 210px", minWidth: 190, border: "1px solid #e7e5e4", borderRadius: 12, overflow: "hidden", background: "#fff" }
+    }, h("div", {
+      style: { padding: "8px 12px", background: "#faf9f7", borderBottom: "1px solid #e7e5e4", display: "flex", justifyContent: "space-between", alignItems: "baseline" }
+    }, h("span", { style: { fontWeight: 700, fontSize: 13 } }, dn), h("span", { style: { fontSize: 11, color: "#a8a29e" } }, dt.getDate() + "." + (dt.getMonth() + 1) + ".")), h("div", {
+      style: { padding: "8px 12px" }
+    }, closed ? h("div", { style: { fontSize: 12, color: "#a8a29e", fontStyle: "italic" } }, "Geschlossen") : stData.length === 0 ? h("div", { style: { fontSize: 12, color: "#a8a29e", fontStyle: "italic" } }, "Keine Schichten") : stData.map(function (sd) {
+      return h("div", { key: sd.label, style: { marginBottom: 7 } }, h("div", {
+        style: { fontSize: 10, fontWeight: 700, color: "#78716c", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 }
+      }, sd.label), sd.entries.map(function (e, ei) {
+        return h("div", { key: ei, style: { fontSize: 12, display: "flex", gap: 6, alignItems: "baseline", padding: "1px 0" } }, h("span", {
+          style: { width: 7, height: 7, borderRadius: "50%", background: e.color, flexShrink: 0, alignSelf: "center" }
+        }), h("span", { style: { fontWeight: e.isArzt ? 700 : 500, color: e.color } }, e.name), h("span", { style: { color: "#a8a29e", fontSize: 11 } }, e.ranges.join(", ")));
+      }));
+    }), absent.length > 0 && h("div", {
+      style: { marginTop: 8, paddingTop: 6, borderTop: "1px dashed #e7e5e4" }
+    }, absent.map(function (a, ai) {
+      return h("div", { key: ai, style: { fontSize: 11, color: "#c0392b" } }, a.note + ": " + a.name);
+    }))));
+  }));
+}
 // WhatsApp share modal
 function ShareModal({
   staffList,
@@ -6290,7 +6357,22 @@ function Schichtplaner() {
       fontWeight: 500,
       cursor: "pointer"
     }
-  }, "Personal")), showAdmin && /*#__PURE__*/React.createElement("div", {
+  }, "Personal"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => {
+      setView("week");
+      setSelectedStaff(null);
+    },
+    style: {
+      padding: isMobile ? "8px 14px" : "6px 14px",
+      borderRadius: 20,
+      border: "none",
+      background: view === "week" ? "#1c1917" : "#f5f5f4",
+      color: view === "week" ? "#fff" : "#78716c",
+      fontSize: isMobile ? 12 : 11,
+      fontWeight: 500,
+      cursor: "pointer"
+    }
+  }, "Übersicht")), showAdmin && /*#__PURE__*/React.createElement("div", {
     className: "no-print",
     style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10, padding: "10px 12px", background: "#faf9f7", borderRadius: 8, border: "1px solid #e7e5e4" }
   }, /*#__PURE__*/React.createElement("span", {
@@ -6366,7 +6448,13 @@ function Schichtplaner() {
       key: i,
       style: { fontSize: 10, color: "#57534e", padding: "3px 0", borderBottom: i < auditLog.length - 1 ? "0.5px solid #f0efed" : "none", display: "flex", gap: 8, justifyContent: "space-between" }
     }, /*#__PURE__*/React.createElement("span", null, fmtStamp(e.at) + (e.by ? " · " + e.by : "")), /*#__PURE__*/React.createElement("span", { style: { color: "#a8a29e", flexShrink: 0 } }, e.what || ""));
-  }))), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
+  }))), view === "week" && /*#__PURE__*/React.createElement(WeekOverview, {
+    assignments: assignments,
+    staffList: staffList,
+    vacations: vacations,
+    weekStart: weekStart,
+    practiceHours: practiceHours
+  }), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10,
       padding: "12px 14px",
