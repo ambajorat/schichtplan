@@ -1249,6 +1249,19 @@ function icsDownload(filename, text) {
     alert("Kalender-Export nicht möglich.");
   }
 }
+// Teilen-Menü (Handy) mit Download als Fallback (Desktop)
+function icsShare(filename, text) {
+  var file = null;
+  try { file = new File([text], filename, { type: "text/calendar" }); } catch (e) { file = null; }
+  if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: "Schichtplan" }).catch(function (err) {
+      // Abbruch durch Nutzer ist ok; bei echtem Fehler herunterladen
+      if (err && err.name !== "AbortError") icsDownload(filename, text);
+    });
+    return;
+  }
+  icsDownload(filename, text);
+}
 function buildPersonLink(assignments, staff, weekStart) {
   var stL = {};
   STATIONS.forEach(function (x) {
@@ -4860,12 +4873,12 @@ function ShareModal({
   };
   const weekTag = fmtDate(getMonday(weekStart));
   const downloadIcs = staff => {
-    icsDownload("Schichtplan-" + (_san(staff.name) || "person") + "-" + weekTag + ".ics", buildPersonIcs(assignments, staffList, weekStart, [staff]));
+    icsShare("Schichtplan-" + (_san(staff.name) || "person") + "-" + weekTag + ".ics", buildPersonIcs(assignments, staffList, weekStart, [staff]));
   };
   const downloadAllIcs = () => {
     var people = staffList.filter(function (s) { return parseFloat(getWeeklyHours(assignments, s.id)) > 0; });
     if (!people.length) return;
-    icsDownload("Schichtplan-Team-" + weekTag + ".ics", buildPersonIcs(assignments, staffList, weekStart, people));
+    icsShare("Schichtplan-Team-" + weekTag + ".ics", buildPersonIcs(assignments, staffList, weekStart, people));
   };
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
@@ -4983,7 +4996,7 @@ function ShareModal({
       }
     }, "Kopieren"), /*#__PURE__*/React.createElement("button", {
       onClick: () => downloadIcs(s),
-      title: "Als Kalender (.ics) speichern",
+      title: "Als Kalender (.ics) teilen oder speichern",
       style: {
         padding: "4px 10px",
         borderRadius: 8,
