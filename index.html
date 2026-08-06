@@ -228,6 +228,16 @@ function fmtDateDE(s) {
   const [y, m, d] = s.split("-");
   return `${d}.${m}.${y}`;
 }
+function fmtStamp(iso) {
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear() + ", " + p(d.getHours()) + ":" + p(d.getMinutes()) + " Uhr";
+  } catch (e) {
+    return "";
+  }
+}
 function weekKey(d) {
   return `wk-${fmtDate(getMonday(d))}`;
 }
@@ -832,6 +842,15 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
   var plan = {};
   var weekHours = {};
   staffList.forEach(function (s) { weekHours[s.id] = 0; });
+  // Arzt-Assistenz-Paar-Präferenzen (weiche Bevorzugung, symmetrisch)
+  var partnerMap = {};
+  staffList.forEach(function (s) {
+    partnerMap[s.id] = {};
+    (s.partners || []).forEach(function (pid) { partnerMap[s.id][pid] = true; });
+  });
+  function isPreferred(aId, bId) {
+    return !!(partnerMap[aId] && partnerMap[aId][bId]) || !!(partnerMap[bId] && partnerMap[bId][aId]);
+  }
   function histScore(sid, dayIdx, stationId) {
     return historyScores && historyScores[sid + "|" + dayIdx + "|" + stationId] || 0;
   }
@@ -920,8 +939,13 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       return { from: bestFrom, to: addEnd(bestTo) };
     }
 
-    function sortFair(arr, stationId) {
+    function sortFair(arr, stationId, preferId) {
       arr.sort(function (a, b) {
+        if (preferId) {
+          var pa = isPreferred(a.id, preferId) ? 1 : 0;
+          var pb = isPreferred(b.id, preferId) ? 1 : 0;
+          if (pa !== pb) return pb - pa;
+        }
         var hw = weekHours[a.id] - weekHours[b.id];
         if (Math.abs(hw) > 0.5) return hw;
         if (stationId) {
@@ -932,14 +956,14 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
       });
     }
 
-    function coverStation(stationId, role, fromT, toT) {
+    function coverStation(stationId, role, fromT, toT, preferId) {
       var candidates = avail.filter(function (a) {
         if (a.rooms.indexOf(stationId) < 0) return false;
         if (a.roles.indexOf(role) < 0) return false;
         if (weekHours[a.id] >= a.maxH) return false;
         return getLongestFreeBlock(a, fromT, toT) !== null;
       });
-      sortFair(candidates, stationId);
+      sortFair(candidates, stationId, preferId);
       var covered = {};
       TIME_SLOTS.forEach(function (ts) {
         var t = timeToMin(ts.start);
@@ -1020,9 +1044,9 @@ function autoSchedule(staffList, vacations, weekStartStr, stationConfig, practic
           if (!hasAssist) continue;
           assignBlock(di, room.id, doc.id, docBlock.from, docBlock.to);
           markBusy(doc.id, docBlock.from, docBlock.to);
-          var assistPlaced = coverStation(room.id, "zfa", docBlock.from, docBlock.to);
+          var assistPlaced = coverStation(room.id, "zfa", docBlock.from, docBlock.to, doc.id);
           if (assistPlaced.length === 0) {
-            coverStation(room.id, "azubi", docBlock.from, docBlock.to);
+            coverStation(room.id, "azubi", docBlock.from, docBlock.to, doc.id);
           }
           placed = true;
         }
@@ -1134,6 +1158,109 @@ function personScheduleText(assignments, staff, staffList, weekStart) {
     lines.push(dn + ": " + parts.join(", "));
   });
   return lines.join("\n");
+}
+function _icsEsc(s) {
+  return String(s == null ? "" : s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+}
+function _icsDt(dateObj, hhmm) {
+  var y = dateObj.getFullYear(),
+    m = String(dateObj.getMonth() + 1).padStart(2, "0"),
+    d = String(dateObj.getDate()).padStart(2, "0");
+  var hm = String(hhmm || "00:00").split(":");
+  return y + m + d + "T" + String(hm[0]).padStart(2, "0") + String(hm[1] || "00").padStart(2, "0") + "00";
+}
+// Zusammenhängende Dienstblöcke einer Person je Wochentag (über Stationen gemergt)
+function personWeekBlocks(assignments, staffId) {
+  var stL = {};
+  STATIONS.forEach(function (x) { stL[x.id] = x.label; });
+  var out = [];
+  DAYS.forEach(function (dn, di) {
+    var byTime = {};
+    Object.entries(assignments).forEach(function (entry) {
+      var k = entry[0], sids = entry[1];
+      if (!sids || sids.indexOf(staffId) < 0) return;
+      var p = k.split("-");
+      if (parseInt(p[0]) !== di) return;
+      var t = p[3];
+      if (!byTime[t]) byTime[t] = [];
+      var lbl = stL[p[1]] || p[1];
+      if (byTime[t].indexOf(lbl) < 0) byTime[t].push(lbl);
+    });
+    var times = Object.keys(byTime).sort();
+    var blocks = [];
+    if (times.length) {
+      var rs = times[0], re = times[0], sts = {};
+      byTime[rs].forEach(function (l) { sts[l] = true; });
+      for (var i = 1; i < times.length; i++) {
+        if (timeToMin(times[i]) === timeToMin(re) + 30) {
+          re = times[i];
+          byTime[re].forEach(function (l) { sts[l] = true; });
+        } else {
+          blocks.push({ from: rs, to: addEnd(re), stations: Object.keys(sts) });
+          rs = times[i]; re = times[i]; sts = {};
+          byTime[rs].forEach(function (l) { sts[l] = true; });
+        }
+      }
+      blocks.push({ from: rs, to: addEnd(re), stations: Object.keys(sts) });
+    }
+    out.push({ di: di, blocks: blocks });
+  });
+  return out;
+}
+function buildPersonIcs(assignments, staffList, weekStart, persons) {
+  var multi = persons.length > 1;
+  var stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//statt-Tipex//Schichtplan//DE", "CALSCALE:GREGORIAN", "METHOD:PUBLISH"];
+  var loc = _tenantId && _tenantId !== "DEMO" ? "Praxis " + _tenantId : "Praxis";
+  persons.forEach(function (staff) {
+    var week = personWeekBlocks(assignments, staff.id);
+    week.forEach(function (day) {
+      var dt = new Date(weekStart);
+      dt.setDate(dt.getDate() + day.di);
+      day.blocks.forEach(function (b, bi) {
+        var st = (b.stations || []).join(" / ");
+        var summary = multi ? staff.name + ": " + (st || "Dienst") : (st || "Dienst");
+        var uid = staff.id + "-" + fmtDate(dt) + "-" + bi + "-" + b.from + "@statt-tipex";
+        lines.push("BEGIN:VEVENT");
+        lines.push("UID:" + uid);
+        lines.push("DTSTAMP:" + stamp);
+        lines.push("DTSTART:" + _icsDt(dt, b.from));
+        lines.push("DTEND:" + _icsDt(dt, b.to));
+        lines.push("SUMMARY:" + _icsEsc(summary));
+        lines.push("LOCATION:" + _icsEsc(loc));
+        lines.push("END:VEVENT");
+      });
+    });
+  });
+  lines.push("END:VCALENDAR");
+  return lines.join("\r\n");
+}
+function icsDownload(filename, text) {
+  try {
+    var blob = new Blob([text], { type: "text/calendar;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+  } catch (e) {
+    alert("Kalender-Export nicht möglich.");
+  }
+}
+// Teilen-Menü (Handy) mit Download als Fallback (Desktop)
+function icsShare(filename, text) {
+  var file = null;
+  try { file = new File([text], filename, { type: "text/calendar" }); } catch (e) { file = null; }
+  if (file && navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    navigator.share({ files: [file], title: "Schichtplan" }).catch(function (err) {
+      // Abbruch durch Nutzer ist ok; bei echtem Fehler herunterladen
+      if (err && err.name !== "AbortError") icsDownload(filename, text);
+    });
+    return;
+  }
+  icsDownload(filename, text);
 }
 function buildPersonLink(assignments, staff, weekStart) {
   var stL = {};
@@ -2986,6 +3113,7 @@ function ExceptionsEditor(props){
 
 function AvailabilityEditor({
   staff,
+  staffList,
   onSave,
   onCancel
 }) {
@@ -2998,6 +3126,10 @@ function AvailabilityEditor({
     return s.id;
   }));
   const [exc, setExc] = useState(staff.exceptions ? JSON.parse(JSON.stringify(staff.exceptions)) : []);
+  const [partners, setPartners] = useState(staff.partners || []);
+  const togglePartner = id => {
+    setPartners(prev => prev.includes(id) ? prev.filter(function (x) { return x !== id; }) : prev.concat([id]));
+  };
   const toggle = di => {
     const n = {
       ...av
@@ -3260,7 +3392,35 @@ function AvailabilityEditor({
     value: exc,
     onChange: setExc,
     color: staff.color
-  }), /*#__PURE__*/React.createElement("div", {
+  }), (function () {
+    var others = (staffList || []).filter(function (o) { return o.id !== staff.id; });
+    if (others.length === 0) return null;
+    return /*#__PURE__*/React.createElement("div", {
+      style: { marginTop: 14 }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, fontWeight: 700, color: "#a8a29e", marginBottom: 6, textTransform: "uppercase" }
+    }, "Bevorzugte Zusammenarbeit"), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: "#78716c", marginBottom: 8 }
+    }, "Der automatische Vorschlag versucht, diese Personen als Arzt-Assistenz-Paar zusammen einzuteilen."), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", flexWrap: "wrap", gap: 6 }
+    }, others.map(function (o) {
+      var on = partners.indexOf(o.id) >= 0;
+      return /*#__PURE__*/React.createElement("button", {
+        key: o.id,
+        onClick: function () { togglePartner(o.id); },
+        style: {
+          padding: "5px 10px",
+          borderRadius: 20,
+          border: on ? "1px solid " + (o.color || "#0f766e") : "1px solid #e7e5e4",
+          background: on ? (o.color || "#0f766e") : "#fff",
+          color: on ? "#fff" : "#44403c",
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: "pointer"
+        }
+      }, o.name);
+    })));
+  })(), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 8,
@@ -3274,7 +3434,8 @@ function AvailabilityEditor({
       vacDays: vDays,
       rooms: rooms,
       roles: roles,
-      exceptions: exc
+      exceptions: exc,
+      partners: partners
     }),
     style: {
       padding: "7px 18px",
@@ -4710,6 +4871,15 @@ function ShareModal({
     const txt = personScheduleText(assignments, staff, staffList, weekStart);
     navigator.clipboard.writeText(txt);
   };
+  const weekTag = fmtDate(getMonday(weekStart));
+  const downloadIcs = staff => {
+    icsShare("Schichtplan-" + (_san(staff.name) || "person") + "-" + weekTag + ".ics", buildPersonIcs(assignments, staffList, weekStart, [staff]));
+  };
+  const downloadAllIcs = () => {
+    var people = staffList.filter(function (s) { return parseFloat(getWeeklyHours(assignments, s.id)) > 0; });
+    if (!people.length) return;
+    icsShare("Schichtplan-Team-" + weekTag + ".ics", buildPersonIcs(assignments, staffList, weekStart, people));
+  };
   return /*#__PURE__*/React.createElement("div", {
     onClick: onClose,
     style: {
@@ -4824,7 +4994,20 @@ function ShareModal({
         fontWeight: 600,
         cursor: "pointer"
       }
-    }, "Kopieren"));
+    }, "Kopieren"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => downloadIcs(s),
+      title: "Als Kalender (.ics) teilen oder speichern",
+      style: {
+        padding: "4px 10px",
+        borderRadius: 8,
+        border: "1px solid #d6d3d1",
+        background: "#fff",
+        color: "#44403c",
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: "pointer"
+      }
+    }, "📅"));
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       staffList.forEach((s, i) => {
@@ -4843,7 +5026,21 @@ function ShareModal({
       cursor: "pointer",
       width: "100%"
     }
-  }, "Alle per WhatsApp senden")));
+  }, "Alle per WhatsApp senden"), /*#__PURE__*/React.createElement("button", {
+    onClick: downloadAllIcs,
+    style: {
+      marginTop: 8,
+      padding: "7px 18px",
+      borderRadius: 10,
+      border: "1px solid #d6d3d1",
+      background: "#fff",
+      color: "#44403c",
+      fontSize: 12,
+      fontWeight: 600,
+      cursor: "pointer",
+      width: "100%"
+    }
+  }, "📅 Team als Kalender (.ics)")));
 }
 function Schichtplaner() {
   var _STATIONS$find;
@@ -4860,12 +5057,17 @@ function Schichtplaner() {
   const [tenantSecured, setTenantSecured] = React.useState(false);
   const [pendingSecure, setPendingSecure] = React.useState(false);
   const [myRole, setMyRole] = React.useState(null);
+  const [meName, setMeName] = React.useState("");
+  const [lastEdit, setLastEdit] = React.useState(null);
+  const [auditLog, setAuditLog] = React.useState([]);
+  const [showAudit, setShowAudit] = React.useState(false);
+  const [undoCount, setUndoCount] = React.useState(0);
   React.useEffect(function(){
     if (authUser && _tenantId && _tenantId !== "DEMO" && _fbDb) {
-      _fbDb.ref("tenantMembers/" + fbKey(_tenantId) + "/" + authUser.uid + "/role").once("value").then(function(s){
-        var r = s.val(); setMyRole(r); _readOnly = (r === "viewer");
-      }).catch(function(){ setMyRole(null); _readOnly = false; });
-    } else { setMyRole(null); _readOnly = false; }
+      _fbDb.ref("tenantMembers/" + fbKey(_tenantId) + "/" + authUser.uid).once("value").then(function(s){
+        var m = s.val() || {}; var r = m.role; setMyRole(r); setMeName(m.name || ""); _readOnly = (r === "viewer");
+      }).catch(function(){ setMyRole(null); setMeName(""); _readOnly = false; });
+    } else { setMyRole(null); setMeName(""); _readOnly = false; }
   }, [authUser && authUser.uid]);
   React.useEffect(function(){
     if(!_tenantId || _tenantId==="DEMO"){ setAuthReady(true); return; }
@@ -5060,6 +5262,11 @@ function Schichtplaner() {
     return m;
   });
   const saveTimer = useRef(null);
+  // Guard: unterscheidet echte Nutzer-Edits von Remote-Sync/Wochenwechsel,
+  // damit "Letzte Änderung" nicht durch Laden/Fremdänderungen ausgelöst wird.
+  const lastEditSkip = useRef(true);
+  const undoStack = useRef([]);
+  const prevAssignRef = useRef(null);
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
@@ -5204,6 +5411,7 @@ function Schichtplaner() {
       const as = loadData(`praxis-${weekKey(weekStart)}`, null);
       setStaffList(st);
       setVacations(va);
+      lastEditSkip.current = true;
       setAssignments(migrateAssignments(as || buildDefault()));
       setLoaded(true);
 
@@ -5328,6 +5536,7 @@ function Schichtplaner() {
           };
         });
         var proposed = autoSchedule(DEMO_STAFF, demoVac, fmtDate(getMonday(today)), cfg, []);
+        lastEditSkip.current = true;
         setAssignments(proposed);
         saveData("praxis-" + weekKey(getMonday(today)), proposed);
       }
@@ -5364,10 +5573,25 @@ function Schichtplaner() {
     if (!loaded) return;
     const wk = `praxis-${weekKey(weekStart)}`;
     const as = loadData(wk, null);
+    lastEditSkip.current = true;
+    undoStack.current = [];
+    prevAssignRef.current = null;
+    setUndoCount(0);
+    setShowAudit(false);
     setAssignments(migrateAssignments(as || buildDefault()));
+    const lek = `praxis-lastedit-${weekKey(weekStart)}`;
+    const auk = `praxis-audit-${weekKey(weekStart)}`;
+    setLastEdit(loadData(lek, null));
+    setAuditLog(loadData(auk, []) || []);
     if (_fbReady) {
       fbListen(wk, function (v) {
-        if (v) setAssignments(migrateAssignments(v));
+        if (v) { lastEditSkip.current = true; setAssignments(migrateAssignments(v)); }
+      });
+      fbListen(lek, function (v) {
+        if (v) setLastEdit(v);
+      });
+      fbListen(auk, function (v) {
+        if (v) setAuditLog(v);
       });
     }
   }, [weekStart, loaded]);
@@ -5384,6 +5608,44 @@ function Schichtplaner() {
     }, 500);
     return () => clearTimeout(saveTimer.current);
   }, [assignments, staffList, vacations, practiceHours, vacRequests, stationReqs, loaded, weekStart]);
+  // Nur bei echten Nutzer-Edits: Undo-Verlauf + "Letzte Änderung" + Audit-Log.
+  useEffect(() => {
+    if (!loaded) { prevAssignRef.current = assignments; return; }
+    var wasSkip = lastEditSkip.current;
+    lastEditSkip.current = false;
+    if (wasSkip) { prevAssignRef.current = assignments; return; }
+    if (_readOnly) { prevAssignRef.current = assignments; return; }
+    var prev = prevAssignRef.current;
+    // Undo-Stack: vorherigen Stand sichern (max. 30)
+    if (prev) {
+      undoStack.current.push(prev);
+      if (undoStack.current.length > 30) undoStack.current.shift();
+      setUndoCount(undoStack.current.length);
+    }
+    // Kurze Zusammenfassung der Änderung (1 Slot = 0,5 h)
+    var cnt = function (a) { var n = 0; if (a) Object.keys(a).forEach(function (k) { var v = a[k]; if (v && v.length) n += v.length; }); return n; };
+    var before = cnt(prev), after = cnt(assignments);
+    var what = after > before ? "+" + (after - before) * 0.5 + " h geplant" : after < before ? "−" + (before - after) * 0.5 + " h entfernt" : "geändert";
+    prevAssignRef.current = assignments;
+    var by = meName;
+    if (!by) { try { by = localStorage.getItem("fb-name") || ""; } catch (e) { by = ""; } }
+    var rec = { at: new Date().toISOString(), by: by, what: what };
+    setLastEdit(rec);
+    saveData(`praxis-lastedit-${weekKey(weekStart)}`, rec);
+    // Audit-Log: rollend, letzte 50 Einträge
+    var log = (auditLog || []).concat([rec]);
+    if (log.length > 50) log = log.slice(log.length - 50);
+    setAuditLog(log);
+    saveData(`praxis-audit-${weekKey(weekStart)}`, log);
+  }, [assignments]);
+  const doUndo = () => {
+    if (!undoStack.current.length) return;
+    var prev = undoStack.current.pop();
+    setUndoCount(undoStack.current.length);
+    lastEditSkip.current = true;
+    prevAssignRef.current = prev;
+    setAssignments(prev);
+  };
   if (roData) return /*#__PURE__*/React.createElement(ReadOnlyView, {
     data: roData
   });
@@ -5742,7 +6004,7 @@ function Schichtplaner() {
       fontVariantNumeric: "tabular-nums",
       cursor: "default"
     }
-  }, "v8.0"), adminMode && /*#__PURE__*/React.createElement("span", {
+  }, "v8.1"), adminMode && /*#__PURE__*/React.createElement("span", {
     style: { marginLeft: 4, fontSize: 9, color: "#0f766e" }
   }, "\u2605"), _tenantId && /*#__PURE__*/React.createElement("span", {
     style: {
@@ -5795,19 +6057,20 @@ function Schichtplaner() {
       fontSize: 10,
       fontWeight: 600
     }
-  }, "⏰ ", violations.size, " Verfügbarkeit"), !isMobile && /*#__PURE__*/React.createElement("button", {
+  }, "⏰ ", violations.size, " Verfügbarkeit"), /*#__PURE__*/React.createElement("button", {
     onClick: () => window.print(),
+    title: "Drucken oder als PDF sichern",
     style: {
-      padding: "5px 12px",
-      borderRadius: 8,
+      padding: isMobile ? "8px 12px" : "5px 12px",
+      borderRadius: isMobile ? 10 : 8,
       border: "1px solid #d6d3d1",
       background: "#fff",
       cursor: "pointer",
-      fontSize: 11,
+      fontSize: isMobile ? 12 : 11,
       fontWeight: 500,
       color: "#44403c"
     }
-  }, "🖨 Drucken"), /*#__PURE__*/React.createElement("button", {
+  }, isMobile ? "🖨 PDF" : "🖨 Drucken"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowShare(true),
     style: {
       padding: isMobile ? "8px 12px" : "5px 12px",
@@ -5932,7 +6195,21 @@ function Schichtplaner() {
       fontSize: isMobile ? 12 : 13,
       fontWeight: 600
     }
-  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd))), /*#__PURE__*/React.createElement("button", {
+  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd))), myRole !== "viewer" && undoCount > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: doUndo,
+    title: "Letzte Änderung rückgängig machen",
+    style: {
+      padding: "6px 12px",
+      borderRadius: 8,
+      border: "0.5px solid #e7e5e4",
+      background: "#fff",
+      cursor: "pointer",
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#44403c",
+      marginLeft: 4
+    }
+  }, "↶ Rückgängig (" + undoCount + ")"), /*#__PURE__*/React.createElement("button", {
     onClick: copyWeek,
     style: {
       padding: "6px 12px",
@@ -6077,7 +6354,27 @@ function Schichtplaner() {
       fontWeight: 500,
       cursor: "pointer"
     }
-  }, "Personal")), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
+  }, "Personal")), lastEdit && /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
+    style: {
+      marginTop: -4,
+      marginBottom: 10
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 10, color: "#a8a29e" }
+  }, "Zuletzt geändert: " + fmtStamp(lastEdit.at) + (lastEdit.by ? " · " + lastEdit.by : "") + (lastEdit.what ? " · " + lastEdit.what : "")), auditLog && auditLog.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowAudit(!showAudit),
+    style: { padding: "2px 8px", borderRadius: 6, border: "0.5px solid #e7e5e4", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 600, color: "#78716c" }
+  }, showAudit ? "Verlauf ausblenden" : "Verlauf (" + auditLog.length + ")")), showAudit && auditLog && auditLog.length > 0 && /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 6, padding: "8px 10px", background: "#faf9f7", border: "1px solid #e7e5e4", borderRadius: 8, maxHeight: 180, overflowY: "auto" }
+  }, auditLog.slice().reverse().map(function (e, i) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: i,
+      style: { fontSize: 10, color: "#57534e", padding: "3px 0", borderBottom: i < auditLog.length - 1 ? "0.5px solid #f0efed" : "none", display: "flex", gap: 8, justifyContent: "space-between" }
+    }, /*#__PURE__*/React.createElement("span", null, fmtStamp(e.at) + (e.by ? " · " + e.by : "")), /*#__PURE__*/React.createElement("span", { style: { color: "#a8a29e", flexShrink: 0 } }, e.what || ""));
+  }))), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10,
       padding: "12px 14px",
@@ -6522,6 +6819,7 @@ function Schichtplaner() {
     onChange: setPracticeHours
   })), tab === "team" && /*#__PURE__*/React.createElement("div", null, editingAv ? /*#__PURE__*/React.createElement(AvailabilityEditor, {
     staff: editingAv,
+    staffList: staffList,
     onCancel: () => setEditingAv(null),
     onSave: u => {
       setStaffList(prev => prev.map(s => s.id === u.id ? u : s));
@@ -7695,7 +7993,12 @@ function Schichtplaner() {
       fontSize: 9,
       color: "#a8a29e"
     }
-  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd)))), DAYS.map((dn, di) => {
+  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd)), _tenantId && _tenantId !== "DEMO" ? " · Praxis " + _tenantId : ""), lastEdit && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 8,
+      color: "#c0c0c0"
+    }
+  }, "Stand: " + fmtStamp(lastEdit.at) + (lastEdit.by ? " · " + lastEdit.by : ""))), DAYS.map((dn, di) => {
     // Collect station->people->time ranges
     const stData = [];
     STATIONS.forEach(st => {
