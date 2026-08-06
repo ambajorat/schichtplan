@@ -120,6 +120,8 @@ tenants/{CODE}/
   praxis-station-reqs   Stationen-Bedarf
   praxis-vacations      Abwesenheiten
   praxis-wk-YYYY-MM-DD   Wochenplan je Woche
+  praxis-lastedit-wk-…   Letzte Änderung je Woche { at, by, what }
+  praxis-audit-wk-…      Änderungsverlauf je Woche (rollend, max. 50)
   praxis-pin / praxis-unlocked
 tenantMembers/{CODE}/{uid}   { name, role, created }
 tenantSecured/{CODE}         true
@@ -134,6 +136,21 @@ feedback/{ts}                Beta-Feedback
   (nichts wird gespeichert; serverseitig ohnehin blockiert).
 
 ## Changelog
+
+### 2026-08 (neu)
+- **Letzte Änderung & Verlauf:** Der Wochenplan merkt sich pro Woche, wer wann
+  zuletzt geändert hat (`praxis-lastedit-…`), inkl. kurzer Zusammenfassung
+  (z. B. „+2 h geplant"). Ein aufklappbarer **Verlauf** zeigt die letzten
+  Einträge (`praxis-audit-…`, rollend max. 50). Beides in Echtzeit synchron.
+- **Rückgängig (Undo):** macht die letzte Planänderung der aktuellen Woche
+  zurück (bis zu 30 Schritte, pro Woche eigener Verlauf).
+- **Kalender-Export (.ics):** persönlicher Wochenplan bzw. Team-Plan als
+  `.ics`-Datei (im „WhatsApp"-Dialog). Import in Apple/Google/Outlook-Kalender.
+- **Arzt-Assistenz-Paar-Präferenzen:** pro Person „Bevorzugte Zusammenarbeit"
+  (im Team-Editor); der automatische Vorschlag versucht, bevorzugte Paare als
+  Arzt-Assistenz zusammen einzuteilen.
+- **Druck/PDF:** Druck-Button jetzt auch mobil; Druck-Header zeigt Praxis-Code
+  und „Stand: …".
 
 ### 2026-08
 - **Login & Rollen:** Anmeldung pro Praxis über Firebase Authentication
