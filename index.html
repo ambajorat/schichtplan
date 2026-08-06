@@ -3127,6 +3127,8 @@ function AvailabilityEditor({
   }));
   const [exc, setExc] = useState(staff.exceptions ? JSON.parse(JSON.stringify(staff.exceptions)) : []);
   const [partners, setPartners] = useState(staff.partners || []);
+  const [color, setColor] = useState(staff.color || "#0f766e");
+  const COLOR_PRESETS = ["#0f766e", "#2563eb", "#db2777", "#16a34a", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#ca8a04", "#4b5563"];
   const togglePartner = id => {
     setPartners(prev => prev.includes(id) ? prev.filter(function (x) { return x !== id; }) : prev.concat([id]));
   };
@@ -3176,15 +3178,41 @@ function AvailabilityEditor({
       width: 24,
       height: 24,
       borderRadius: 10,
-      background: staff.color + "20",
+      background: color + "20",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
       fontSize: 12,
       fontWeight: 700,
-      color: staff.color
+      color: color
     }
   }, staff.name[0]), staff.name), /*#__PURE__*/React.createElement("div", {
+    style: { marginBottom: 14 }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: "#a8a29e", fontWeight: 600, marginBottom: 6 }
+  }, "Farbe"), /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", flexWrap: "wrap", gap: 6, alignItems: "center" }
+  }, COLOR_PRESETS.map(function (c) {
+    var on = (color || "").toLowerCase() === c.toLowerCase();
+    return /*#__PURE__*/React.createElement("button", {
+      key: c,
+      onClick: function () { setColor(c); },
+      title: c,
+      style: {
+        width: 26, height: 26, borderRadius: "50%", background: c, cursor: "pointer",
+        border: on ? "2px solid #1c1917" : "2px solid #fff",
+        boxShadow: on ? "0 0 0 1px #1c1917" : "0 0 0 1px #e7e5e4"
+      }
+    });
+  }), /*#__PURE__*/React.createElement("label", {
+    title: "Eigene Farbe",
+    style: { display: "inline-flex", alignItems: "center", gap: 4, marginLeft: 4, fontSize: 11, color: "#78716c", cursor: "pointer" }
+  }, /*#__PURE__*/React.createElement("input", {
+    type: "color",
+    value: color,
+    onChange: function (e) { setColor(e.target.value); },
+    style: { width: 26, height: 26, padding: 0, border: "1px solid #e7e5e4", borderRadius: 6, background: "#fff", cursor: "pointer" }
+  }), "eigene"))), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 16,
@@ -3435,7 +3463,8 @@ function AvailabilityEditor({
       rooms: rooms,
       roles: roles,
       exceptions: exc,
-      partners: partners
+      partners: partners,
+      color: color
     }),
     style: {
       padding: "7px 18px",
@@ -4903,6 +4932,7 @@ function WeekOverview({ assignments, staffList, vacations, weekStart, practiceHo
     }).filter(Boolean);
     return h("div", {
       key: di,
+      className: "wk-card",
       style: { flex: "1 1 210px", minWidth: 190, border: "1px solid #e7e5e4", borderRadius: 12, overflow: "hidden", background: "#fff" }
     }, h("div", {
       style: { padding: "8px 12px", background: "#faf9f7", borderBottom: "1px solid #e7e5e4", display: "flex", justifyContent: "space-between", alignItems: "baseline" }
@@ -6016,6 +6046,8 @@ function Schichtplaner() {
         .print-day th{background:#f5f5f4!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:7px;padding:2px 3px!important;border:0.5px solid #d6d3d1}
         .print-day td{font-size:8px;padding:2px 3px!important;border:0.5px solid #ddd;height:14px}
         .print-chip{font-size:7px!important;padding:1px 3px!important;border-radius:3px!important;border-width:1px!important}
+        .print-only,.print-only *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        .wk-card{break-inside:avoid;page-break-inside:avoid;flex:1 1 30%!important}
         @page{size:landscape;margin:8mm}
       }
       .print-only{display:none}
@@ -8055,7 +8087,21 @@ function Schichtplaner() {
     assignments: assignments,
     weekStart: weekStart,
     onClose: () => setShowShare(false)
-  }), feedbackButton, /*#__PURE__*/React.createElement("div", {
+  }), feedbackButton, view === "week" && /*#__PURE__*/React.createElement("div", {
+    className: "print-only"
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { textAlign: "center", marginBottom: 8 }
+  }, /*#__PURE__*/React.createElement("h1", {
+    style: { fontSize: 14, fontWeight: 800, margin: 0 }
+  }, "statt-Tipex · Wochenübersicht"), /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 9, color: "#a8a29e" }
+  }, fmtDateDE(wsStr) + " – " + fmtDateDE(fmtDate(wEnd)) + (_tenantId && _tenantId !== "DEMO" ? " · Praxis " + _tenantId : ""))), /*#__PURE__*/React.createElement(WeekOverview, {
+    assignments: assignments,
+    staffList: staffList,
+    vacations: vacations,
+    weekStart: weekStart,
+    practiceHours: practiceHours
+  })), view !== "week" && /*#__PURE__*/React.createElement("div", {
     className: "print-only"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
