@@ -191,6 +191,8 @@ var STATIONS = function () {
     return DEFAULT_STATIONS;
   }
 }();
+var STATION_ICONS = { "empfang": "E", "buero": "B", "zi1": "1", "zi2": "2", "zi3": "3", "zi4": "4", "zi5": "5", "zi6": "6", "steri": "S", "springer": "Sp" };
+var STATION_COLORS = { "empfang": "#0f766e", "buero": "#78716c", "zi1": "#2563eb", "zi2": "#7c3aed", "zi3": "#0891b2", "zi4": "#c2410c", "zi5": "#16a34a", "zi6": "#16a34a", "steri": "#db2777", "springer": "#78716c" };
 function genSlots() {
   const s = [];
   for (let h = 7; h < 20; h++) for (let m = 0; m < 60; m += 30) {
@@ -2643,8 +2645,8 @@ function MobileStationView({
     }
   }, stationData.map(function (sd, si) {
     var firstTime = sd.entries.length > 0 && sd.entries[0].ranges[0] ? sd.entries[0].ranges[0].from : "08:00";
-    var stIcons = {"empfang":"E","buero":"B","zi1":"1","zi2":"2","zi3":"3","zi4":"4","zi5":"5","zi6":"6","steri":"S","springer":"Sp"};
-    var stColors = {"empfang":"#0f766e","buero":"#78716c","zi1":"#2563eb","zi2":"#7c3aed","zi3":"#0891b2","zi4":"#c2410c","zi5":"#16a34a","zi6":"#16a34a","steri":"#db2777","springer":"#78716c"};
+    var stIcons = STATION_ICONS;
+    var stColors = STATION_COLORS;
     return /*#__PURE__*/React.createElement("div", {
       key: sd.station.id,
       onClick: function () {
@@ -4885,11 +4887,12 @@ function VacationManager({
   })));
 }
 
-// Wochen-Übersicht: pro Tag eine Karte mit allen Räumen und Personen
+// Wochen-Übersicht: pro Tag eine Karte im Stil der Tagesansicht
+// (Stations-Badge + Personen-Pillen; jede Person je Station nur einmal)
 function WeekOverview({ assignments, staffList, vacations, weekStart, practiceHours }) {
   var h = React.createElement;
   return h("div", {
-    style: { display: "flex", flexWrap: "wrap", gap: 12 }
+    style: { display: "flex", flexWrap: "wrap", gap: 12, alignItems: "flex-start" }
   }, DAYS.map(function (dn, di) {
     var stData = [];
     STATIONS.forEach(function (st) {
@@ -4901,7 +4904,7 @@ function WeekOverview({ assignments, staffList, vacations, weekStart, practiceHo
         if (parseInt(p[0]) !== di || p[1] !== st.id) return;
         sids.forEach(function (sid) {
           if (!people[sid]) people[sid] = [];
-          people[sid].push(p[3]);
+          if (people[sid].indexOf(p[3]) < 0) people[sid].push(p[3]);
         });
       });
       var entries = [];
@@ -4915,12 +4918,12 @@ function WeekOverview({ assignments, staffList, vacations, weekStart, practiceHo
         }
         ranges.push(rs + "–" + addEnd(re));
         var s = staffList.find(function (x) { return x.id === sid; });
-        if (s) entries.push({ name: s.name, color: s.color, ranges: ranges, isArzt: hasRole(s, "arzt") });
+        if (s) entries.push({ staff: s, ranges: ranges, isArzt: hasRole(s, "arzt") });
       });
       entries.sort(function (a, b) {
         return (b.isArzt ? 1 : 0) - (a.isArzt ? 1 : 0) || (a.ranges[0] || "").localeCompare(b.ranges[0] || "");
       });
-      if (entries.length) stData.push({ label: st.label, entries: entries });
+      if (entries.length) stData.push({ station: st, entries: entries });
     });
     var dt = new Date(weekStart);
     dt.setDate(dt.getDate() + di);
@@ -4933,23 +4936,34 @@ function WeekOverview({ assignments, staffList, vacations, weekStart, practiceHo
     return h("div", {
       key: di,
       className: "wk-card",
-      style: { flex: "1 1 210px", minWidth: 190, border: "1px solid #e7e5e4", borderRadius: 12, overflow: "hidden", background: "#fff" }
+      style: { flex: "1 1 220px", minWidth: 200, border: "1px solid #e7e5e4", borderRadius: 12, overflow: "hidden", background: "#fff" }
     }, h("div", {
       style: { padding: "8px 12px", background: "#faf9f7", borderBottom: "1px solid #e7e5e4", display: "flex", justifyContent: "space-between", alignItems: "baseline" }
     }, h("span", { style: { fontWeight: 700, fontSize: 13 } }, dn), h("span", { style: { fontSize: 11, color: "#a8a29e" } }, dt.getDate() + "." + (dt.getMonth() + 1) + ".")), h("div", {
-      style: { padding: "8px 12px" }
+      style: { padding: "8px 10px", display: "flex", flexDirection: "column", gap: 9 }
     }, closed ? h("div", { style: { fontSize: 12, color: "#a8a29e", fontStyle: "italic" } }, "Geschlossen") : stData.length === 0 ? h("div", { style: { fontSize: 12, color: "#a8a29e", fontStyle: "italic" } }, "Keine Schichten") : stData.map(function (sd) {
-      return h("div", { key: sd.label, style: { marginBottom: 7 } }, h("div", {
-        style: { fontSize: 10, fontWeight: 700, color: "#78716c", textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 2 }
-      }, sd.label), sd.entries.map(function (e, ei) {
-        return h("div", { key: ei, style: { fontSize: 12, display: "flex", gap: 6, alignItems: "baseline", padding: "1px 0" } }, h("span", {
-          style: { width: 7, height: 7, borderRadius: "50%", background: e.color, flexShrink: 0, alignSelf: "center" }
-        }), h("span", { style: { fontWeight: e.isArzt ? 700 : 500, color: e.color } }, e.name), h("span", { style: { color: "#a8a29e", fontSize: 11 } }, e.ranges.join(", ")));
-      }));
+      var sc = STATION_COLORS[sd.station.id] || "#78716c";
+      var ic = STATION_ICONS[sd.station.id] || (sd.station.label ? sd.station.label[0] : "?");
+      return h("div", { key: sd.station.id }, h("div", {
+        style: { display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }
+      }, h("span", {
+        style: { width: 20, height: 20, borderRadius: 6, background: sc, color: "#fff", fontSize: 10, fontWeight: 700, display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }
+      }, ic), h("span", { style: { fontSize: 12, fontWeight: 600, color: "#44403c" } }, sd.station.label)), h("div", {
+        style: { display: "flex", flexWrap: "wrap", gap: 4 }
+      }, sd.entries.map(function (e, ei) {
+        return h("span", {
+          key: ei,
+          style: { display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 20, background: e.staff.color + "18", border: "1px solid " + e.staff.color + "30" }
+        }, h("span", { style: { fontSize: 11, fontWeight: 600, color: e.staff.color } }, e.staff.name), e.isArzt && h("span", {
+          style: { fontSize: 7, padding: "1px 3px", borderRadius: 3, background: e.staff.color, color: "#fff", fontWeight: 700 }
+        }, "A"), h("span", {
+          style: { fontSize: 9.5, fontWeight: 500, color: "#78716c", fontVariantNumeric: "tabular-nums" }
+        }, e.ranges.join(", ")));
+      })));
     }), absent.length > 0 && h("div", {
-      style: { marginTop: 8, paddingTop: 6, borderTop: "1px dashed #e7e5e4" }
+      style: { marginTop: 2, paddingTop: 6, borderTop: "1px dashed #e7e5e4", display: "flex", flexWrap: "wrap", gap: 4 }
     }, absent.map(function (a, ai) {
-      return h("div", { key: ai, style: { fontSize: 11, color: "#c0392b" } }, a.note + ": " + a.name);
+      return h("span", { key: ai, style: { fontSize: 10, color: "#c0392b", background: "#fdecea", borderRadius: 12, padding: "1px 8px" } }, a.note + ": " + a.name);
     }))));
   }));
 }
