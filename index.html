@@ -4929,9 +4929,10 @@ function ShareModal({
     style: {
       fontSize: 11,
       color: "#78716c",
-      marginBottom: 12
+      marginBottom: 12,
+      lineHeight: 1.5
     }
-  }, "Jede Person erhält ihren individuellen Wochenplan."), /*#__PURE__*/React.createElement("div", {
+  }, "Jede Person erhält ihren individuellen Wochenplan. ", /*#__PURE__*/React.createElement("b", { style: { color: "#25D366" } }, "WhatsApp"), " sendet den Plan als Nachricht · ", /*#__PURE__*/React.createElement("b", null, "Kopieren"), " legt ihn in die Zwischenablage · ", /*#__PURE__*/React.createElement("b", null, "📅"), " als Kalender (.ics) zum Teilen/Importieren."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       flexDirection: "column",
@@ -5008,14 +5009,16 @@ function ShareModal({
         cursor: "pointer"
       }
     }, "📅"));
-  })), /*#__PURE__*/React.createElement("button", {
+  })), /*#__PURE__*/React.createElement("div", {
+    style: { marginTop: 16, marginBottom: 8, paddingTop: 12, borderTop: "1px solid #e7e5e4", fontSize: 10, fontWeight: 700, color: "#a8a29e", textTransform: "uppercase", letterSpacing: 0.5 }
+  }, "Für alle auf einmal"), /*#__PURE__*/React.createElement("button", {
     onClick: () => {
       staffList.forEach((s, i) => {
         if (parseFloat(getWeeklyHours(assignments, s.id)) > 0) setTimeout(() => shareWhatsApp(s), i * 500);
       });
     },
     style: {
-      marginTop: 12,
+      marginTop: 0,
       padding: "7px 18px",
       borderRadius: 10,
       border: "none",
@@ -5184,6 +5187,7 @@ function Schichtplaner() {
     setSmTo(close);
   }, [shiftModal]);
   const [showStationCfg, setShowStationCfg] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const [isMobile, setIsMobile] = useState(function () {
     return typeof window !== "undefined" && window.innerWidth < 768;
   });
@@ -6195,7 +6199,9 @@ function Schichtplaner() {
       fontSize: isMobile ? 12 : 13,
       fontWeight: 600
     }
-  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd))), myRole !== "viewer" && undoCount > 0 && /*#__PURE__*/React.createElement("button", {
+  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd))), /*#__PURE__*/React.createElement("div", {
+    style: { width: 1, height: 22, background: "#e7e5e4", margin: "0 2px" }
+  }), myRole !== "viewer" && undoCount > 0 && /*#__PURE__*/React.createElement("button", {
     onClick: doUndo,
     title: "Letzte Änderung rückgängig machen",
     style: {
@@ -6224,93 +6230,6 @@ function Schichtplaner() {
     }
   }, "Woche kopieren"), /*#__PURE__*/React.createElement("button", {
     onClick: function () {
-      if (confirm("Aktuelle Woche als Standardwoche speichern?")) {
-        saveData("praxis-standard-week", assignments);
-        alert("Standardwoche gespeichert.");
-      }
-    },
-    style: {
-      padding: "6px 12px",
-      borderRadius: 8,
-      border: "0.5px solid #e7e5e4",
-      background: "#fff",
-      cursor: "pointer",
-      fontSize: 10,
-      fontWeight: 500,
-      color: "#78716c"
-    }
-  }, "Als Standard speichern"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      var sw = loadData("praxis-standard-week", null);
-      if (!sw) {
-        alert("Noch keine Standardwoche gespeichert.");
-        return;
-      }
-      if (confirm("Standardwoche laden? Aktuelle Planung wird ersetzt.")) {
-        setAssignments(sw);
-      }
-    },
-    style: {
-      padding: "6px 12px",
-      borderRadius: 8,
-      border: "none",
-      background: "#f5f5f4",
-      cursor: "pointer",
-      fontSize: 10,
-      fontWeight: 600,
-      color: "#44403c"
-    }
-  }, "Standardwoche"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      if (confirm("Alle Schichten dieser Woche l\u00f6schen?")) {
-        setAssignments({});
-      }
-    },
-    style: {
-      padding: "6px 12px",
-      borderRadius: 8,
-      border: "0.5px solid #fecaca",
-      background: "#fff",
-      cursor: "pointer",
-      fontSize: 10,
-      fontWeight: 500,
-      color: "#dc2626"
-    }
-  }, "Leere Woche"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
-      var removed = 0;
-      var next = {};
-      Object.keys(assignments || {}).forEach(function (k) {
-        var parts = k.split("-");
-        var di = parseInt(parts[0], 10);
-        var time = parts[3];
-        var dt = new Date(wsStr + "T00:00:00");
-        dt.setDate(dt.getDate() + di);
-        var ds = fmtDate(dt);
-        var closed = isPracticeClosed(practiceHours || [], ds, di);
-        var ph = getPracticeHoursForDay(practiceHours || [], wsStr, di);
-        var drop = false;
-        if (closed) drop = true;else if (ph && time && (time < ph.from || time >= ph.to)) drop = true;
-        if (drop) { removed++; return; }
-        next[k] = assignments[k];
-      });
-      if (removed === 0) { alert("Keine Schichten au\u00dferhalb der \u00d6ffnungszeiten gefunden."); return; }
-      if (confirm(removed + " Schicht-Eintrag(e) au\u00dferhalb der \u00d6ffnungszeiten entfernen?")) {
-        setAssignments(next);
-      }
-    },
-    style: {
-      padding: "6px 12px",
-      borderRadius: 8,
-      border: "0.5px solid #fdba74",
-      background: "#fff",
-      cursor: "pointer",
-      fontSize: 10,
-      fontWeight: 500,
-      color: "#ea580c"
-    }
-  }, "Au\u00dferh. \u00d6ffnungszeiten r\u00e4umen"), /*#__PURE__*/React.createElement("button", {
-    onClick: function () {
       setShowStationCfg(!showStationCfg);
     },
     style: {
@@ -6324,6 +6243,23 @@ function Schichtplaner() {
       color: showStationCfg ? "#fff" : "#0f766e"
     }
   }, "Vorschlag"), /*#__PURE__*/React.createElement("div", {
+    style: { width: 1, height: 22, background: "#e7e5e4", margin: "0 2px" }
+  }), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      setShowAdmin(!showAdmin);
+    },
+    title: "Weitere Aktionen: Standardwoche, leeren, aufr\u00e4umen",
+    style: {
+      padding: "6px 12px",
+      borderRadius: 8,
+      border: "0.5px solid #e7e5e4",
+      background: showAdmin ? "#e7e5e4" : "#fff",
+      cursor: "pointer",
+      fontSize: 10,
+      fontWeight: 600,
+      color: "#44403c"
+    }
+  }, "\u2699 Verwaltung"), /*#__PURE__*/React.createElement("div", {
     style: {
       flex: 1
     }
@@ -6354,7 +6290,63 @@ function Schichtplaner() {
       fontWeight: 500,
       cursor: "pointer"
     }
-  }, "Personal")), lastEdit && /*#__PURE__*/React.createElement("div", {
+  }, "Personal")), showAdmin && /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
+    style: { display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 10, padding: "10px 12px", background: "#faf9f7", borderRadius: 8, border: "1px solid #e7e5e4" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 10, fontWeight: 700, color: "#a8a29e", textTransform: "uppercase", letterSpacing: 0.5, marginRight: 2 }
+  }, "Verwaltung"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (confirm("Aktuelle Woche als Standardwoche speichern?")) {
+        saveData("praxis-standard-week", assignments);
+        alert("Standardwoche gespeichert.");
+      }
+    },
+    style: { padding: "6px 12px", borderRadius: 8, border: "0.5px solid #e7e5e4", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 500, color: "#78716c" }
+  }, "Als Standard speichern"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var sw = loadData("praxis-standard-week", null);
+      if (!sw) {
+        alert("Noch keine Standardwoche gespeichert.");
+        return;
+      }
+      if (confirm("Standardwoche laden? Aktuelle Planung wird ersetzt.")) {
+        setAssignments(sw);
+      }
+    },
+    style: { padding: "6px 12px", borderRadius: 8, border: "none", background: "#f5f5f4", cursor: "pointer", fontSize: 10, fontWeight: 600, color: "#44403c" }
+  }, "Standardwoche laden"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      if (confirm("Alle Schichten dieser Woche löschen?")) {
+        setAssignments({});
+      }
+    },
+    style: { padding: "6px 12px", borderRadius: 8, border: "0.5px solid #fecaca", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 500, color: "#dc2626" }
+  }, "Leere Woche"), /*#__PURE__*/React.createElement("button", {
+    onClick: function () {
+      var removed = 0;
+      var next = {};
+      Object.keys(assignments || {}).forEach(function (k) {
+        var parts = k.split("-");
+        var di = parseInt(parts[0], 10);
+        var time = parts[3];
+        var dt = new Date(wsStr + "T00:00:00");
+        dt.setDate(dt.getDate() + di);
+        var ds = fmtDate(dt);
+        var closed = isPracticeClosed(practiceHours || [], ds, di);
+        var ph = getPracticeHoursForDay(practiceHours || [], wsStr, di);
+        var drop = false;
+        if (closed) drop = true;else if (ph && time && (time < ph.from || time >= ph.to)) drop = true;
+        if (drop) { removed++; return; }
+        next[k] = assignments[k];
+      });
+      if (removed === 0) { alert("Keine Schichten außerhalb der Öffnungszeiten gefunden."); return; }
+      if (confirm(removed + " Schicht-Eintrag(e) außerhalb der Öffnungszeiten entfernen?")) {
+        setAssignments(next);
+      }
+    },
+    style: { padding: "6px 12px", borderRadius: 8, border: "0.5px solid #fdba74", background: "#fff", cursor: "pointer", fontSize: 10, fontWeight: 500, color: "#ea580c" }
+  }, "Außerh. Öffnungszeiten räumen")), lastEdit && /*#__PURE__*/React.createElement("div", {
     className: "no-print",
     style: {
       marginTop: -4,
