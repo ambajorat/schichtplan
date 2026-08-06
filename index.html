@@ -228,6 +228,16 @@ function fmtDateDE(s) {
   const [y, m, d] = s.split("-");
   return `${d}.${m}.${y}`;
 }
+function fmtStamp(iso) {
+  try {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getDate()) + "." + p(d.getMonth() + 1) + "." + d.getFullYear() + ", " + p(d.getHours()) + ":" + p(d.getMinutes()) + " Uhr";
+  } catch (e) {
+    return "";
+  }
+}
 function weekKey(d) {
   return `wk-${fmtDate(getMonday(d))}`;
 }
@@ -4860,12 +4870,14 @@ function Schichtplaner() {
   const [tenantSecured, setTenantSecured] = React.useState(false);
   const [pendingSecure, setPendingSecure] = React.useState(false);
   const [myRole, setMyRole] = React.useState(null);
+  const [meName, setMeName] = React.useState("");
+  const [lastEdit, setLastEdit] = React.useState(null);
   React.useEffect(function(){
     if (authUser && _tenantId && _tenantId !== "DEMO" && _fbDb) {
-      _fbDb.ref("tenantMembers/" + fbKey(_tenantId) + "/" + authUser.uid + "/role").once("value").then(function(s){
-        var r = s.val(); setMyRole(r); _readOnly = (r === "viewer");
-      }).catch(function(){ setMyRole(null); _readOnly = false; });
-    } else { setMyRole(null); _readOnly = false; }
+      _fbDb.ref("tenantMembers/" + fbKey(_tenantId) + "/" + authUser.uid).once("value").then(function(s){
+        var m = s.val() || {}; var r = m.role; setMyRole(r); setMeName(m.name || ""); _readOnly = (r === "viewer");
+      }).catch(function(){ setMyRole(null); setMeName(""); _readOnly = false; });
+    } else { setMyRole(null); setMeName(""); _readOnly = false; }
   }, [authUser && authUser.uid]);
   React.useEffect(function(){
     if(!_tenantId || _tenantId==="DEMO"){ setAuthReady(true); return; }
@@ -5060,6 +5072,9 @@ function Schichtplaner() {
     return m;
   });
   const saveTimer = useRef(null);
+  // Guard: unterscheidet echte Nutzer-Edits von Remote-Sync/Wochenwechsel,
+  // damit "Letzte Änderung" nicht durch Laden/Fremdänderungen ausgelöst wird.
+  const lastEditSkip = useRef(true);
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
@@ -5204,6 +5219,7 @@ function Schichtplaner() {
       const as = loadData(`praxis-${weekKey(weekStart)}`, null);
       setStaffList(st);
       setVacations(va);
+      lastEditSkip.current = true;
       setAssignments(migrateAssignments(as || buildDefault()));
       setLoaded(true);
 
@@ -5328,6 +5344,7 @@ function Schichtplaner() {
           };
         });
         var proposed = autoSchedule(DEMO_STAFF, demoVac, fmtDate(getMonday(today)), cfg, []);
+        lastEditSkip.current = true;
         setAssignments(proposed);
         saveData("praxis-" + weekKey(getMonday(today)), proposed);
       }
@@ -5364,10 +5381,16 @@ function Schichtplaner() {
     if (!loaded) return;
     const wk = `praxis-${weekKey(weekStart)}`;
     const as = loadData(wk, null);
+    lastEditSkip.current = true;
     setAssignments(migrateAssignments(as || buildDefault()));
+    const lek = `praxis-lastedit-${weekKey(weekStart)}`;
+    setLastEdit(loadData(lek, null));
     if (_fbReady) {
       fbListen(wk, function (v) {
-        if (v) setAssignments(migrateAssignments(v));
+        if (v) { lastEditSkip.current = true; setAssignments(migrateAssignments(v)); }
+      });
+      fbListen(lek, function (v) {
+        if (v) setLastEdit(v);
       });
     }
   }, [weekStart, loaded]);
@@ -5384,6 +5407,17 @@ function Schichtplaner() {
     }, 500);
     return () => clearTimeout(saveTimer.current);
   }, [assignments, staffList, vacations, practiceHours, vacRequests, stationReqs, loaded, weekStart]);
+  // "Letzte Änderung": nur bei echten Nutzer-Edits am Wochenplan schreiben.
+  useEffect(() => {
+    if (!loaded) return;
+    if (lastEditSkip.current) { lastEditSkip.current = false; return; }
+    if (_readOnly) return;
+    var by = meName;
+    if (!by) { try { by = localStorage.getItem("fb-name") || ""; } catch (e) { by = ""; } }
+    var rec = { at: new Date().toISOString(), by: by };
+    setLastEdit(rec);
+    saveData(`praxis-lastedit-${weekKey(weekStart)}`, rec);
+  }, [assignments]);
   if (roData) return /*#__PURE__*/React.createElement(ReadOnlyView, {
     data: roData
   });
@@ -5795,19 +5829,20 @@ function Schichtplaner() {
       fontSize: 10,
       fontWeight: 600
     }
-  }, "⏰ ", violations.size, " Verfügbarkeit"), !isMobile && /*#__PURE__*/React.createElement("button", {
+  }, "⏰ ", violations.size, " Verfügbarkeit"), /*#__PURE__*/React.createElement("button", {
     onClick: () => window.print(),
+    title: "Drucken oder als PDF sichern",
     style: {
-      padding: "5px 12px",
-      borderRadius: 8,
+      padding: isMobile ? "8px 12px" : "5px 12px",
+      borderRadius: isMobile ? 10 : 8,
       border: "1px solid #d6d3d1",
       background: "#fff",
       cursor: "pointer",
-      fontSize: 11,
+      fontSize: isMobile ? 12 : 11,
       fontWeight: 500,
       color: "#44403c"
     }
-  }, "🖨 Drucken"), /*#__PURE__*/React.createElement("button", {
+  }, isMobile ? "🖨 PDF" : "🖨 Drucken"), /*#__PURE__*/React.createElement("button", {
     onClick: () => setShowShare(true),
     style: {
       padding: isMobile ? "8px 12px" : "5px 12px",
@@ -6077,7 +6112,15 @@ function Schichtplaner() {
       fontWeight: 500,
       cursor: "pointer"
     }
-  }, "Personal")), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
+  }, "Personal")), lastEdit && /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
+    style: {
+      fontSize: 10,
+      color: "#a8a29e",
+      marginTop: -4,
+      marginBottom: 10
+    }
+  }, "Zuletzt geändert: " + fmtStamp(lastEdit.at) + (lastEdit.by ? " · " + lastEdit.by : "")), view === "station" && /*#__PURE__*/React.createElement(React.Fragment, null, showStationCfg && /*#__PURE__*/React.createElement("div", {
     style: {
       marginBottom: 10,
       padding: "12px 14px",
@@ -7695,7 +7738,12 @@ function Schichtplaner() {
       fontSize: 9,
       color: "#a8a29e"
     }
-  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd)))), DAYS.map((dn, di) => {
+  }, fmtDateDE(wsStr), " – ", fmtDateDE(fmtDate(wEnd)), _tenantId && _tenantId !== "DEMO" ? " · Praxis " + _tenantId : ""), lastEdit && /*#__PURE__*/React.createElement("div", {
+    style: {
+      fontSize: 8,
+      color: "#c0c0c0"
+    }
+  }, "Stand: " + fmtStamp(lastEdit.at) + (lastEdit.by ? " · " + lastEdit.by : ""))), DAYS.map((dn, di) => {
     // Collect station->people->time ranges
     const stData = [];
     STATIONS.forEach(st => {
