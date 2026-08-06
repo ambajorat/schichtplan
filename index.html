@@ -778,6 +778,47 @@ function findViolations(assignments, staffList, vacations, weekStartStr) {
   });
   return violations;
 }
+// Detailierte Verfügbarkeits-Verstöße je Person/Tag/Station (mit Zeitbereich + Grund)
+function violationDetails(assignments, staffList, vacations, weekStartStr) {
+  var map = {};
+  Object.keys(assignments).forEach(function (k) {
+    var sids = assignments[k];
+    if (!sids || !sids.length) return;
+    var p = k.split("-");
+    var day = parseInt(p[0]);
+    var stId = p[1];
+    var time = p[3];
+    sids.forEach(function (sid) {
+      var staff = staffList.find(function (s) { return s.id === sid; });
+      if (!staff) return;
+      if (isAvailable(staff, day, time, vacations, weekStartStr)) return;
+      var mk = sid + "|" + day + "|" + stId;
+      if (!map[mk]) map[mk] = { staff: staff, day: day, stId: stId, times: [] };
+      if (map[mk].times.indexOf(time) < 0) map[mk].times.push(time);
+    });
+  });
+  var stL = {};
+  STATIONS.forEach(function (x) { stL[x.id] = x.label; });
+  var out = [];
+  Object.keys(map).forEach(function (mk) {
+    var m = map[mk];
+    m.times.sort();
+    var ranges = [], rs = m.times[0], re = m.times[0];
+    for (var i = 1; i < m.times.length; i++) {
+      if (timeToMin(m.times[i]) === timeToMin(re) + 30) re = m.times[i];
+      else { ranges.push(rs + "–" + addEnd(re)); rs = m.times[i]; re = m.times[i]; }
+    }
+    ranges.push(rs + "–" + addEnd(re));
+    var dt = new Date(weekStartStr + "T00:00:00");
+    dt.setDate(dt.getDate() + m.day);
+    var ds = fmtDate(dt);
+    var vac = vacations.find(function (v) { return v.staffId === m.staff.id && ds >= v.from && ds <= v.to; });
+    var reason = vac ? (vac.note || "Abwesend") : "außerhalb Verfügbarkeit";
+    out.push({ staff: m.staff, day: m.day, station: stL[m.stId] || m.stId, ranges: ranges, reason: reason });
+  });
+  out.sort(function (a, b) { return a.day - b.day || a.staff.name.localeCompare(b.staff.name); });
+  return out;
+}
 function getDynSlots(assignments, day) {
   var slots = {};
   STATIONS.forEach(function (st) {
@@ -5431,6 +5472,8 @@ function Schichtplaner() {
   const wsStr = fmtDate(weekStart);
   const conflicts = useMemo(() => findConflicts(assignments), [assignments]);
   const violations = useMemo(() => findViolations(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
+  const violationList = useMemo(() => violationDetails(assignments, staffList, vacations, wsStr), [assignments, staffList, vacations, wsStr]);
+  const [showViolations, setShowViolations] = useState(false);
   const addShiftFromModal = useCallback(staffId => {
     if (!shiftModal || !staffId) return;
     setAssignments(prev => {
@@ -6211,16 +6254,54 @@ function Schichtplaner() {
       fontSize: 10,
       fontWeight: 600
     }
-  }, "⚠ ", conflicts.size, " Konflikte"), violations.size > 0 && /*#__PURE__*/React.createElement("span", {
+  }, "⚠ ", conflicts.size, " Konflikte"), violations.size > 0 && /*#__PURE__*/React.createElement("div", {
+    className: "no-print",
+    style: { position: "relative" }
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowViolations(!showViolations),
+    title: "Betroffene Schichten anzeigen",
     style: {
       background: "#fff8e1",
       color: "#f57f17",
       padding: "3px 9px",
       borderRadius: 8,
       fontSize: 10,
-      fontWeight: 600
+      fontWeight: 600,
+      border: "none",
+      cursor: "pointer"
     }
-  }, "⏰ ", violations.size, " Verfügbarkeit"), /*#__PURE__*/React.createElement("button", {
+  }, "⏰ ", violations.size, " Verfügbarkeit ", showViolations ? "▲" : "▼"), showViolations && /*#__PURE__*/React.createElement("div", {
+    style: {
+      position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 60,
+      width: 290, maxHeight: 320, overflowY: "auto",
+      background: "#fff", border: "1px solid #e7e5e4", borderRadius: 10,
+      boxShadow: "0 10px 30px rgba(0,0,0,0.15)", padding: 8, textAlign: "left"
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "2px 4px 8px" }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: { fontSize: 10, fontWeight: 700, color: "#a8a29e", textTransform: "uppercase" }
+  }, "Außerhalb Verfügbarkeit"), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setShowViolations(false),
+    style: { background: "none", border: "none", cursor: "pointer", color: "#a8a29e", fontSize: 14, lineHeight: 1 }
+  }, "×")), violationList.length === 0 ? /*#__PURE__*/React.createElement("div", {
+    style: { fontSize: 11, color: "#a8a29e", padding: "4px 6px" }
+  }, "Keine Details") : violationList.map(function (vd, vi) {
+    return /*#__PURE__*/React.createElement("div", {
+      key: vi,
+      style: { padding: "5px 6px", borderTop: vi > 0 ? "1px solid #f5f5f4" : "none" }
+    }, /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", alignItems: "center", gap: 6 }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: { width: 8, height: 8, borderRadius: "50%", background: vd.staff.color, flexShrink: 0 }
+    }), /*#__PURE__*/React.createElement("span", {
+      style: { fontSize: 12, fontWeight: 600, color: vd.staff.color }
+    }, vd.staff.name)), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 11, color: "#44403c", marginLeft: 14, fontVariantNumeric: "tabular-nums" }
+    }, DAYS[vd.day].slice(0, 2) + " · " + vd.ranges.join(", ") + " · " + vd.station), /*#__PURE__*/React.createElement("div", {
+      style: { fontSize: 9.5, color: "#c2410c", marginLeft: 14 }
+    }, vd.reason));
+  }))), /*#__PURE__*/React.createElement("button", {
     onClick: () => window.print(),
     title: "Drucken oder als PDF sichern",
     style: {
